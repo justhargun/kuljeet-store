@@ -8,6 +8,34 @@ import {
   LogOut, Flower, ShoppingBasket, Smartphone, ImagePlus, KeyRound
 } from 'lucide-react';
 
+/* ------------------------------------------------------------------------
+   window.storage is an API provided by the Claude artifact preview only.
+   On a real deployed site it doesn't exist, so this shim recreates the same
+   interface using the browser's own localStorage — this makes the app work
+   standalone once deployed, keeping data on each visitor's own device.
+------------------------------------------------------------------------- */
+if (typeof window !== 'undefined' && !window.storage) {
+  window.storage = {
+    async get(key) {
+      const v = localStorage.getItem(key);
+      if (v === null) throw new Error('not found');
+      return { key, value: v };
+    },
+    async set(key, value) {
+      localStorage.setItem(key, value);
+      return { key, value };
+    },
+    async delete(key) {
+      localStorage.removeItem(key);
+      return { key, deleted: true };
+    },
+    async list(prefix) {
+      const keys = Object.keys(localStorage).filter((k) => !prefix || k.startsWith(prefix));
+      return { keys };
+    },
+  };
+}
+
 /* ---------------------------------- THEME ---------------------------------- */
 const COLORS = {
   bg: '#FBF6EC',
@@ -188,11 +216,6 @@ const CATEGORIES = [
   { id: 'offers', name: 'Offers & Discounts', Icon: Tag, color: COLORS.danger, virtual: 'deal' },
 ];
 const REAL_CATEGORIES = CATEGORIES.filter((c) => !c.virtual);
-function EmojiIconFactory(emoji) {
-  return function EmojiIcon({ size, color }) {
-    return <span style={{ fontSize: size, lineHeight: 1 }}>{emoji}</span>;
-  };
-}
 
 const GRADIENTS = [
   ['#F7D9C4', '#F0B499'], ['#CDEFE3', '#9CD9C3'], ['#E4D6F5', '#C9AEEB'],
@@ -417,23 +440,7 @@ function Rail({ products, onOpen, onAdd, cart }) {
 }
 
 /* --------------------------------- HEADER / NAV --------------------------------- */
-function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack, title, shopName, products = [], nav, categories = [] }) {
-  const [focused, setFocused] = useState(false);
-
-  const suggestions = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return { products: [], categories: [] };
-    const matchedProducts = products
-      .filter((p) => p.name.toLowerCase().includes(q))
-      .slice(0, 5);
-    const matchedCategories = categories
-      .filter((c) => c.name.toLowerCase().includes(q))
-      .slice(0, 3);
-    return { products: matchedProducts, categories: matchedCategories };
-  }, [query, products]);
-
-  const hasSuggestions = focused && query.trim() && (suggestions.products.length > 0 || suggestions.categories.length > 0);
-
+function Header({ query, setQuery, onSearch, area, onChangeLocation, onBack, title, shopName }) {
   if (title) {
     return (
       <div className="sticky top-0 z-20 flex items-center gap-3 px-4 py-3" style={{ background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}` }}>
@@ -460,82 +467,17 @@ function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack
           <ChevronDown size={12} color={COLORS.inkSoft} />
         </button>
       </div>
-      <div className="px-4 py-3 relative">
-        <form onSubmit={(e) => { e.preventDefault(); setFocused(false); onSearch(); }}>
-          <div
-            className="flex items-center gap-2 px-3 py-2.5"
-            style={{
-              background: '#fff', border: `1.5px solid ${focused ? COLORS.primary : COLORS.border}`,
-              borderRadius: hasSuggestions ? '14px 14px 0 0' : 14,
-              boxShadow: focused ? '0 4px 14px rgba(217,115,13,0.12)' : 'none',
-              transition: 'border-color 120ms ease, box-shadow 120ms ease',
-            }}
-          >
-            <Search size={16} color={focused ? COLORS.primary : COLORS.inkSoft} />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onFocus={() => setFocused(true)}
-              onBlur={() => setTimeout(() => setFocused(false), 150)}
-              placeholder="Search products..."
-              style={{ fontFamily: bodyFont, fontSize: 13.5, color: COLORS.ink, background: 'transparent', outline: 'none', width: '100%' }}
-            />
-            {query && (
-              <button type="button" onClick={() => setQuery('')} className="flex-shrink-0">
-                <X size={15} color={COLORS.inkSoft} />
-              </button>
-            )}
-          </div>
-        </form>
-
-        {hasSuggestions && (
-          <div
-            className="absolute left-4 right-4 overflow-hidden z-30"
-            style={{ top: '100%', marginTop: -1, background: '#fff', border: `1.5px solid ${COLORS.primary}`, borderTop: 'none', borderRadius: '0 0 14px 14px', boxShadow: '0 10px 24px rgba(43,32,19,0.12)' }}
-          >
-            {suggestions.categories.length > 0 && (
-              <div className="px-3 pt-2.5 pb-1 flex gap-1.5 flex-wrap">
-                {suggestions.categories.map((c) => (
-                  <button
-                    key={c.id}
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => { setQuery(''); nav('category', { id: c.id }); }}
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full"
-                    style={{ background: `${c.color}14`, border: `1px solid ${c.color}40` }}
-                  >
-                    <c.Icon size={11} color={c.color} />
-                    <span style={{ fontFamily: bodyFont, fontSize: 10.5, fontWeight: 700, color: c.color }}>{c.name}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-            {suggestions.products.map((p) => (
-              <button
-                key={p.id}
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => { setQuery(''); nav('product', { id: p.id }); }}
-                className="w-full flex items-center gap-3 px-3 py-2"
-                style={{ borderTop: `1px solid ${COLORS.border}` }}
-              >
-                <div className="rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden" style={{ width: 34, height: 34, background: p.imageUrl ? '#fff' : `linear-gradient(135deg, ${p.g1}, ${p.g2})` }}>
-                  {p.imageUrl ? <img src={p.imageUrl} alt={p.name} className="w-full h-full" style={{ objectFit: 'cover' }} /> : <span style={{ fontSize: 15 }}>{p.emoji}</span>}
-                </div>
-                <span style={{ ...clamp1, flex: 1, textAlign: 'left', fontFamily: bodyFont, fontSize: 12.5, color: COLORS.ink }}>{p.name}</span>
-                <span style={{ fontFamily: monoFont, fontSize: 12, fontWeight: 700, color: COLORS.primaryDark, flexShrink: 0 }}>{money(p.price)}</span>
-              </button>
-            ))}
-            <button
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => { setFocused(false); onSearch(); }}
-              className="w-full flex items-center justify-center gap-1.5 py-2.5"
-              style={{ borderTop: `1px solid ${COLORS.border}`, background: COLORS.cream }}
-            >
-              <Search size={12} color={COLORS.primaryDark} />
-              <span style={{ fontFamily: bodyFont, fontSize: 11.5, fontWeight: 700, color: COLORS.primaryDark }}>See all results for &ldquo;{query}&rdquo;</span>
-            </button>
-          </div>
-        )}
-      </div>
+      <form onSubmit={(e) => { e.preventDefault(); onSearch(); }} className="px-4 py-3">
+        <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ background: '#fff', border: `1px solid ${COLORS.border}` }}>
+          <Search size={16} color={COLORS.inkSoft} />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search products..."
+            style={{ fontFamily: bodyFont, fontSize: 13.5, color: COLORS.ink, background: 'transparent', outline: 'none', width: '100%' }}
+          />
+        </div>
+      </form>
     </div>
   );
 }
@@ -545,6 +487,7 @@ function BottomNav({ page, nav, cartCount }) {
     { id: 'home', label: 'Home', Icon: Home },
     { id: 'categories', label: 'Categories', Icon: LayoutGrid },
     { id: 'cart', label: 'Cart', Icon: ShoppingCart, badge: cartCount },
+    { id: 'myorders', label: 'Orders', Icon: ClipboardList },
     { id: 'admin', label: 'Admin', Icon: Lock },
   ];
   return (
@@ -618,7 +561,7 @@ function LocationModal({ onClose, onConfirm, deliverySettings }) {
 }
 
 /* ----------------------------------- PAGES ----------------------------------- */
-function HomePage({ products, nav, onAdd, cart, area, categories }) {
+function HomePage({ products, nav, onAdd, cart, area }) {
   const bestSellers = products.filter((p) => p.bestSeller);
   const newArrivals = products.filter((p) => p.isNew);
   const deals = products.filter((p) => p.deal);
@@ -636,7 +579,7 @@ function HomePage({ products, nav, onAdd, cart, area, categories }) {
 
       <SectionHeader title="Shop by Category" />
       <div className="grid grid-cols-4 gap-3 px-4 mb-6">
-        {categories.map((c) => (
+        {CATEGORIES.map((c) => (
           <button key={c.id} onClick={() => nav('category', { id: c.id })} className="flex flex-col items-center gap-1.5">
             <div className="rounded-2xl flex items-center justify-center" style={{ width: 56, height: 56, background: `${c.color}1A` }}>
               <c.Icon size={22} color={c.color} />
@@ -668,10 +611,10 @@ function HomePage({ products, nav, onAdd, cart, area, categories }) {
   );
 }
 
-function CategoriesPage({ nav, categories }) {
+function CategoriesPage({ nav }) {
   return (
     <div className="p-4 grid grid-cols-2 gap-3">
-      {categories.map((c) => (
+      {REAL_CATEGORIES.map((c) => (
         <button key={c.id} onClick={() => nav('category', { id: c.id })} className="rounded-2xl p-4 flex flex-col items-start gap-3" style={{ background: `${c.color}14`, border: `1px solid ${c.color}33` }}>
           <div className="rounded-xl flex items-center justify-center" style={{ width: 42, height: 42, background: c.color }}>
             <c.Icon size={20} color="#fff" />
@@ -1029,6 +972,7 @@ function AdminLogin({ onLogin, adminPassword }) {
       >
         Login
       </button>
+      {adminPassword === 'admin123' && <p style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft, marginTop: 14 }}>First time here? Default password is admin123 &mdash; change it under Admin &rarr; Delivery once you're in.</p>}
     </div>
   );
 }
@@ -1091,23 +1035,9 @@ function AdminOverview({ products, orders }) {
   );
 }
 
-function AdminProducts({ products, setProducts, categories, customCategories, setCustomCategories }) {
+function AdminProducts({ products, setProducts }) {
   const [showAdd, setShowAdd] = useState(false);
-  const [showCats, setShowCats] = useState(false);
-  const [catForm, setCatForm] = useState({ name: '', emoji: '\ud83c\udff7\ufe0f', color: '#D9730D' });
-  const [form, setForm] = useState({ name: '', category: categories[0].id, price: '', mrp: '', stock: '', emoji: '\ud83d\udecd\ufe0f', desc: '', imageUrl: '' });
-
-  const addCategory = () => {
-    if (!catForm.name.trim()) return;
-    const baseId = catForm.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-    let id = baseId || 'category';
-    let n = 1;
-    const existingIds = new Set(categories.map((c) => c.id));
-    while (existingIds.has(id)) { id = `${baseId}-${n}`; n += 1; }
-    setCustomCategories([...customCategories, { id, name: catForm.name.trim(), emoji: catForm.emoji || '\ud83c\udff7\ufe0f', color: catForm.color || '#D9730D' }]);
-    setCatForm({ name: '', emoji: '\ud83c\udff7\ufe0f', color: '#D9730D' });
-  };
-  const removeCategory = (id) => setCustomCategories(customCategories.filter((c) => c.id !== id));
+  const [form, setForm] = useState({ name: '', category: REAL_CATEGORIES[0].id, price: '', mrp: '', stock: '', emoji: '\ud83d\udecd\ufe0f', desc: '', imageUrl: '' });
 
   const update = (id, patch) => {
     setProducts(products.map((p) => (p.id === id ? { ...p, ...patch } : p)));
@@ -1152,41 +1082,12 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
     } else {
       setProducts([...products, { id: 'p' + Date.now(), ...draft }]);
     }
-    setForm({ name: '', category: categories[0].id, price: '', mrp: '', stock: '', emoji: '\ud83d\udecd\ufe0f', desc: '', imageUrl: '' });
+    setForm({ name: '', category: REAL_CATEGORIES[0].id, price: '', mrp: '', stock: '', emoji: '\ud83d\udecd\ufe0f', desc: '', imageUrl: '' });
     setShowAdd(false);
   };
 
   return (
     <div className="p-4">
-      <button onClick={() => setShowCats(!showCats)} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl mb-3" style={{ border: `1.5px solid ${COLORS.ink}`, color: COLORS.ink }}>
-        <Tag size={15} /> <span style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 13 }}>{showCats ? 'Close Categories' : 'Manage Categories'}</span>
-      </button>
-
-      {showCats && (
-        <div className="rounded-2xl p-4 mb-4 flex flex-col gap-3" style={{ background: '#fff', border: `1px solid ${COLORS.border}` }}>
-          <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft }}>The 13 built-in categories are always available. Add your own below &mdash; they'll show up here, on the homepage, and in Shop by Category.</p>
-          {customCategories.length > 0 && (
-            <div className="flex flex-col gap-2">
-              {customCategories.map((c) => (
-                <div key={c.id} className="flex items-center justify-between px-3 py-2 rounded-lg" style={{ background: `${c.color}14` }}>
-                  <span className="flex items-center gap-2">
-                    <span style={{ fontSize: 16 }}>{c.emoji}</span>
-                    <span style={{ fontFamily: bodyFont, fontSize: 12.5, fontWeight: 700, color: COLORS.ink }}>{c.name}</span>
-                  </span>
-                  <button onClick={() => removeCategory(c.id)}><Trash2 size={14} color={COLORS.danger} /></button>
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="flex gap-2">
-            <input value={catForm.name} onChange={(e) => setCatForm({ ...catForm, name: e.target.value })} placeholder="Category name" className="flex-1 px-3 py-2.5 rounded-lg" style={{ border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }} />
-            <input value={catForm.emoji} onChange={(e) => setCatForm({ ...catForm, emoji: e.target.value })} placeholder="Icon" className="w-16 px-2 py-2.5 rounded-lg text-center" style={{ border: `1px solid ${COLORS.border}`, fontSize: 15, outline: 'none' }} />
-            <input type="color" value={catForm.color} onChange={(e) => setCatForm({ ...catForm, color: e.target.value })} className="w-11 rounded-lg" style={{ border: `1px solid ${COLORS.border}`, padding: 2 }} />
-          </div>
-          <button onClick={addCategory} className="py-2.5 rounded-lg" style={{ background: COLORS.ink, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>Add Category</button>
-        </div>
-      )}
-
       <button onClick={() => setShowAdd(!showAdd)} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl mb-4" style={{ background: COLORS.ink, color: '#fff' }}>
         <PlusCircle size={16} /> <span style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 13 }}>{showAdd ? 'Close Form' : 'Add Product'}</span>
       </button>
@@ -1195,7 +1096,7 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
         <div className="rounded-2xl p-4 mb-4 flex flex-col gap-2.5" style={{ background: '#fff', border: `1px solid ${COLORS.border}` }}>
           <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Product name" className="px-3 py-2.5 rounded-lg" style={{ border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }} />
           <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="px-3 py-2.5 rounded-lg" style={{ border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5 }}>
-            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {REAL_CATEGORIES.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           <div className="flex gap-2">
             <input value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value.replace(/\D/g, '') })} placeholder="Selling price" className="flex-1 px-3 py-2.5 rounded-lg" style={{ border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 12.5, outline: 'none' }} />
@@ -1448,7 +1349,7 @@ function AdminCustomers({ orders }) {
   );
 }
 
-function AdminPage({ products, setProducts, orders, setOrders, deliverySettings, setDeliverySettings, onLogout, adminPassword, setAdminPassword, allRealCategories, customCategories, setCustomCategories }) {
+function AdminPage({ products, setProducts, orders, setOrders, deliverySettings, setDeliverySettings, onLogout, adminPassword, setAdminPassword }) {
   const [tab, setTab] = useState('overview');
   return (
     <div className="pb-6">
@@ -1458,7 +1359,7 @@ function AdminPage({ products, setProducts, orders, setOrders, deliverySettings,
       </div>
       <AdminTabs tab={tab} setTab={setTab} />
       {tab === 'overview' && <AdminOverview products={products} orders={orders} />}
-      {tab === 'products' && <AdminProducts products={products} setProducts={setProducts} categories={allRealCategories} customCategories={customCategories} setCustomCategories={setCustomCategories} />}
+      {tab === 'products' && <AdminProducts products={products} setProducts={setProducts} />}
       {tab === 'orders' && <AdminOrders orders={orders} setOrders={setOrders} whatsappNumber={deliverySettings.whatsappNumber} />}
       {tab === 'delivery' && <AdminDelivery settings={deliverySettings} setSettings={setDeliverySettings} />}
       {tab === 'customers' && <AdminCustomers orders={orders} />}
@@ -1480,7 +1381,6 @@ export default function App() {
   const [showLocationModal, setShowLocationModal] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminPassword, setAdminPassword] = useState('admin123');
-  const [customCategories, setCustomCategories] = useState([]);
   const [lastOrder, setLastOrder] = useState(null);
   const [lastMobile, setLastMobile] = useState('');
 
@@ -1494,20 +1394,18 @@ export default function App() {
 
   useEffect(() => {
     (async () => {
-      // Cart, saved location, the admin password, and custom categories are always local
-      // to this browser, regardless of whether a Supabase backend is connected.
+      // Cart, saved location, and the admin password are always local to this browser,
+      // regardless of whether a Supabase backend is connected.
       try {
         const results = await Promise.allSettled([
           window.storage.get('mm-cart'),
           window.storage.get('mm-location'),
           window.storage.get('mm-admin-pw'),
-          window.storage.get('mm-custom-categories'),
         ]);
-        const [c, loc, pw, cc] = results.map((r) => (r.status === 'fulfilled' ? r.value : null));
+        const [c, loc, pw] = results.map((r) => (r.status === 'fulfilled' ? r.value : null));
         if (c && c.value) setCart(JSON.parse(c.value));
         if (loc && loc.value) { setDeliveryArea(loc.value); setShowLocationModal(false); }
         if (pw && pw.value) setAdminPassword(pw.value);
-        if (cc && cc.value) setCustomCategories(JSON.parse(cc.value));
       } catch (e) { /* keep defaults */ }
 
       if (BACKEND_ENABLED) {
@@ -1545,19 +1443,8 @@ export default function App() {
   useEffect(() => { if (loaded && !BACKEND_ENABLED) window.storage.set('mm-delivery', JSON.stringify(deliverySettings)).catch(() => {}); }, [deliverySettings, loaded]);
   useEffect(() => { if (loaded) window.storage.set('mm-cart', JSON.stringify(cart)).catch(() => {}); }, [cart, loaded]);
   useEffect(() => { if (loaded) window.storage.set('mm-admin-pw', adminPassword).catch(() => {}); }, [adminPassword, loaded]);
-  useEffect(() => { if (loaded) window.storage.set('mm-custom-categories', JSON.stringify(customCategories)).catch(() => {}); }, [customCategories, loaded]);
 
   const nav = (page, params = {}) => { setRoute({ page, params }); window.scrollTo(0, 0); };
-
-  const customCategoriesWithIcon = useMemo(
-    () => customCategories.map((c) => ({ ...c, Icon: EmojiIconFactory(c.emoji) })),
-    [customCategories]
-  );
-  const allRealCategories = useMemo(() => [...REAL_CATEGORIES, ...customCategoriesWithIcon], [customCategoriesWithIcon]);
-  const allCategories = useMemo(
-    () => [...REAL_CATEGORIES, ...customCategoriesWithIcon, ...CATEGORIES.filter((c) => c.virtual)],
-    [customCategoriesWithIcon]
-  );
 
   const addToCart = (product, n = 1) => {
     setCart((c) => ({ ...c, [product.id]: (c[product.id] || 0) + n }));
@@ -1605,14 +1492,14 @@ export default function App() {
   const filteredForSearch = useMemo(() => {
     if (!query.trim()) return [];
     const q = query.toLowerCase();
-    return products.filter((p) => p.name.toLowerCase().includes(q) || allCategories.find((c) => c.id === p.category)?.name.toLowerCase().includes(q));
-  }, [query, products, allCategories]);
+    return products.filter((p) => p.name.toLowerCase().includes(q) || CATEGORIES.find((c) => c.id === p.category)?.name.toLowerCase().includes(q));
+  }, [query, products]);
 
   const runSearch = () => { if (query.trim()) nav('list', { title: `Results for "${query}"`, filter: 'search' }); };
 
   let categoryProducts = [];
   if (route.page === 'category') {
-    const cat = allCategories.find((c) => c.id === route.params.id);
+    const cat = CATEGORIES.find((c) => c.id === route.params.id);
     if (cat?.virtual === 'isNew') categoryProducts = products.filter((p) => p.isNew);
     else if (cat?.virtual === 'deal') categoryProducts = products.filter((p) => p.deal || p.mrp > p.price);
     else categoryProducts = products.filter((p) => p.category === route.params.id);
@@ -1633,7 +1520,7 @@ export default function App() {
   const showBackHeader = route.page === 'category' || route.page === 'product' || route.page === 'checkout' || route.page === 'list';
 
   const headerTitleMap = {
-    category: allCategories.find((c) => c.id === route.params.id)?.name,
+    category: CATEGORIES.find((c) => c.id === route.params.id)?.name,
     product: currentProduct?.name,
     checkout: 'Checkout',
     list: listTitle,
@@ -1666,13 +1553,13 @@ export default function App() {
           showBackHeader ? (
             <Header title={headerTitleMap[route.page] || ''} onBack={() => nav(route.page === 'product' ? 'home' : 'home')} />
           ) : (
-            <Header query={query} setQuery={setQuery} onSearch={runSearch} area={deliveryArea} onChangeLocation={() => setShowLocationModal(true)} shopName={deliverySettings.shopName} products={products} nav={nav} categories={allRealCategories} />
+            <Header query={query} setQuery={setQuery} onSearch={runSearch} area={deliveryArea} onChangeLocation={() => setShowLocationModal(true)} shopName={deliverySettings.shopName} />
           )
         )}
 
         <div className="flex-1">
-          {route.page === 'home' && <HomePage products={products} nav={nav} onAdd={addToCart} cart={cart} area={deliveryArea} categories={allCategories} />}
-          {route.page === 'categories' && <CategoriesPage nav={nav} categories={allRealCategories} />}
+          {route.page === 'home' && <HomePage products={products} nav={nav} onAdd={addToCart} cart={cart} area={deliveryArea} />}
+          {route.page === 'categories' && <CategoriesPage nav={nav} />}
           {route.page === 'category' && <ProductListPage products={categoryProducts} nav={nav} onAdd={addToCart} cart={cart} />}
           {route.page === 'list' && <ProductListPage products={listProducts} nav={nav} onAdd={addToCart} cart={cart} />}
           {route.page === 'product' && <ProductPage product={currentProduct} nav={nav} onAdd={addToCart} onBuyNow={buyNow} qty={currentProduct ? (cart[currentProduct.id] || 0) : 0} />}
@@ -1692,7 +1579,6 @@ export default function App() {
               deliverySettings={deliverySettings} setDeliverySettings={setDeliverySettings}
               onLogout={() => { setIsAdmin(false); nav('home'); }}
               adminPassword={adminPassword} setAdminPassword={setAdminPassword}
-              allRealCategories={allRealCategories} customCategories={customCategories} setCustomCategories={setCustomCategories}
             />
           )}
         </div>
