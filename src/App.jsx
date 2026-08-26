@@ -8,6 +8,34 @@ import {
   LogOut, Flower, ShoppingBasket, Smartphone, ImagePlus, KeyRound
 } from 'lucide-react';
 
+/* ------------------------------------------------------------------------
+   window.storage is an API provided by the Claude artifact preview only.
+   On a real deployed site it doesn't exist, so this shim recreates the same
+   interface using the browser's own localStorage — this makes the app work
+   standalone once deployed, keeping data on each visitor's own device.
+------------------------------------------------------------------------- */
+if (typeof window !== 'undefined' && !window.storage) {
+  window.storage = {
+    async get(key) {
+      const v = localStorage.getItem(key);
+      if (v === null) throw new Error('not found');
+      return { key, value: v };
+    },
+    async set(key, value) {
+      localStorage.setItem(key, value);
+      return { key, value };
+    },
+    async delete(key) {
+      localStorage.removeItem(key);
+      return { key, deleted: true };
+    },
+    async list(prefix) {
+      const keys = Object.keys(localStorage).filter((k) => !prefix || k.startsWith(prefix));
+      return { keys };
+    },
+  };
+}
+
 /* ---------------------------------- THEME ---------------------------------- */
 const COLORS = {
   bg: '#FBF6EC',
@@ -417,7 +445,7 @@ function Rail({ products, onOpen, onAdd, cart }) {
 }
 
 /* --------------------------------- HEADER / NAV --------------------------------- */
-function Header({ query, setQuery, onSearch, area, onChangeLocation, onBack, title, shopName, products, nav, categories }) {
+function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack, title, shopName, products = [], nav, categories = [] }) {
   const [focused, setFocused] = useState(false);
 
   const suggestions = useMemo(() => {
