@@ -1,0 +1,14 @@
+{
+  "name": "Kuljeet Store",
+  "short_name": "Kuljeet Store",
+  "description": "Your neighbourhood, delivered.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FBF6EC",
+  "theme_color": "#D9730D",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
