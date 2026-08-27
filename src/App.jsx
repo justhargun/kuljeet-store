@@ -1633,7 +1633,23 @@ export default function App() {
             sbSelect('delivery_settings', '?select=*&id=eq.1'),
             sbSelect('delivery_pincodes', '?select=*'),
           ]);
-          if (prodRows && prodRows.length) setProducts(prodRows.map(mapProductFromDb));
+          if (prodRows && prodRows.length) {
+            setProducts(prodRows.map(mapProductFromDb));
+          } else {
+            // First-time setup: Supabase has no products yet, so push the built-in
+            // demo catalog into it once, and use the real database rows (with real
+            // UUIDs) from then on instead of the local-only demo ids.
+            try {
+              const seedRows = await sbInsert('products', SEED_PRODUCTS.map((p) => ({
+                category: p.category, name: p.name, price: p.price, mrp: p.mrp, stock: p.stock,
+                emoji: p.emoji, g1: p.g1, g2: p.g2, rating: p.rating, best_seller: p.bestSeller,
+                is_new: p.isNew, deal: p.deal, description: p.desc, image_url: p.imageUrl || null,
+              })));
+              setProducts(seedRows.map(mapProductFromDb));
+            } catch (e) {
+              console.error('Could not seed Supabase with demo products, showing local demo data instead:', e);
+            }
+          }
           if (settingsRows && settingsRows[0]) setDeliverySettings(mapDeliveryFromDb(settingsRows[0], pinRows || []));
         } catch (e) {
           console.error('Supabase load failed, showing local demo data instead:', e);
