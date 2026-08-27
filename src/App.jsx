@@ -8,31 +8,37 @@ import {
   LogOut, Flower, ShoppingBasket, Smartphone, ImagePlus, KeyRound
 } from 'lucide-react';
 
-/* ------------------------------------------------------------------------
-   window.storage is an API provided by the Claude artifact preview only.
-   On a real deployed site it doesn't exist, so this shim recreates the same
-   interface using the browser's own localStorage — this makes the app work
-   standalone once deployed, keeping data on each visitor's own device.
-------------------------------------------------------------------------- */
 if (typeof window !== 'undefined' && !window.storage) {
   window.storage = {
-    async get(key) {
-      const v = localStorage.getItem(key);
-      if (v === null) throw new Error('not found');
-      return { key, value: v };
+    async get(key, shared) {
+      try {
+        const raw = window.localStorage.getItem(key);
+        if (raw === null) return null;
+        return { key, value: raw, shared: !!shared };
+      } catch (e) { throw e; }
     },
-    async set(key, value) {
-      localStorage.setItem(key, value);
-      return { key, value };
+    async set(key, value, shared) {
+      try {
+        window.localStorage.setItem(key, value);
+        return { key, value, shared: !!shared };
+      } catch (e) { throw e; }
     },
-    async delete(key) {
-      localStorage.removeItem(key);
-      return { key, deleted: true };
+    async delete(key, shared) {
+      try {
+        window.localStorage.removeItem(key);
+        return { key, deleted: true, shared: !!shared };
+      } catch (e) { throw e; }
     },
-    async list(prefix) {
-      const keys = Object.keys(localStorage).filter((k) => !prefix || k.startsWith(prefix));
-      return { keys };
-    },
+    async list(prefix, shared) {
+      try {
+        const keys = [];
+        for (let i = 0; i < window.localStorage.length; i++) {
+          const k = window.localStorage.key(i);
+          if (!prefix || (k && k.startsWith(prefix))) keys.push(k);
+        }
+        return { keys, prefix, shared: !!shared };
+      } catch (e) { throw e; }
+    }
   };
 }
 
@@ -189,6 +195,8 @@ function mapDeliveryFromDb(row, pinRows) {
     radiusKm: Number(row.radius_km), minOrderValue: Number(row.min_order_value), deliveryCharge: Number(row.delivery_charge),
     freeDeliveryThreshold: Number(row.free_delivery_threshold), whatsappNumber: row.whatsapp_number,
     upiId: row.upi_id || '',
+    openTime: row.open_time || '09:00',
+    closeTime: row.close_time || '21:00',
     pincodes: (pinRows || []).map((p) => ({ pincode: p.pincode, area: p.area })),
   };
 }
@@ -287,6 +295,8 @@ const SEED_DELIVERY = {
   freeDeliveryThreshold: 499,
   whatsappNumber: '918433355769',
   upiId: '8433355769@nyes',
+  openTime: '09:00',
+  closeTime: '21:00',
 };
 // Demo-only distance lookup, used when the shop chooses radius-based delivery.
 // In production this would call a maps/geocoding API instead of a fixed table.
@@ -307,7 +317,31 @@ function checkDeliveryZone(pinRaw, settings) {
   return dist <= settings.radiusKm ? { allowed: true, distance: dist } : { allowed: false, reason: 'outside', distance: dist };
 }
 
+function formatTime12(t) {
+  if (!t) return '';
+  const [h, m] = t.split(':').map(Number);
+  const period = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${String(m).padStart(2, '0')} ${period}`;
+}
+function isShopOpen(settings) {
+  if (!settings.openTime || !settings.closeTime) return true;
+  const [oh, om] = settings.openTime.split(':').map(Number);
+  const [ch, cm] = settings.closeTime.split(':').map(Number);
+  const now = new Date();
+  const nowMins = now.getHours() * 60 + now.getMinutes();
+  const openMins = oh * 60 + om;
+  const closeMins = ch * 60 + cm;
+  if (closeMins > openMins) return nowMins >= openMins && nowMins < closeMins;
+  return nowMins >= openMins || nowMins < closeMins; // handles overnight hours, e.g. 18:00-02:00
+}
+
 const STATUS_STEPS = ['Order Received', 'Confirmed', 'Packing', 'Out for Delivery', 'Delivered'];
+const CANCELLABLE_STATUSES = ['Order Received', 'Confirmed'];
+function cancelOrderById(id, orders, setOrders) {
+  setOrders(orders.map((o) => (o.id === id ? { ...o, status: 'Cancelled' } : o)));
+  if (BACKEND_ENABLED) sbUpdate('orders', `id=eq.${id}`, { status: 'Cancelled' }).catch((e) => console.error('Order cancellation failed to sync:', e));
+}
 
 /* -------------------------------- SMALL PARTS -------------------------------- */
 function PriceTag({ price, mrp, size = 'md' }) {
@@ -329,6 +363,16 @@ function PriceTag({ price, mrp, size = 'md' }) {
 }
 
 function StatusStepper({ status, compact }) {
+  if (status === 'Cancelled') {
+    return (
+      <div className="flex items-center gap-2 py-1">
+        <div className="rounded-full flex items-center justify-center" style={{ width: compact ? 18 : 26, height: compact ? 18 : 26, background: COLORS.danger }}>
+          <X size={compact ? 11 : 14} color="#fff" />
+        </div>
+        <span style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: compact ? 11.5 : 13, color: COLORS.danger }}>Order Cancelled</span>
+      </div>
+    );
+  }
   const idx = Math.max(0, STATUS_STEPS.indexOf(status));
   return (
     <div className="flex items-start w-full">
@@ -445,8 +489,9 @@ function Rail({ products, onOpen, onAdd, cart }) {
 }
 
 /* --------------------------------- HEADER / NAV --------------------------------- */
-function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack, title, shopName, products = [], nav, categories = [] }) {
+function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack, title, shopName, products = [], nav, categories = [], deliverySettings }) {
   const [focused, setFocused] = useState(false);
+  const shopOpen = deliverySettings ? isShopOpen(deliverySettings) : true;
 
   const suggestions = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -488,6 +533,14 @@ function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack
           <ChevronDown size={12} color={COLORS.inkSoft} />
         </button>
       </div>
+      {deliverySettings && (
+        <div className="px-4 pt-2 flex items-center gap-1.5">
+          <div className="rounded-full" style={{ width: 6, height: 6, background: shopOpen ? COLORS.secondary : COLORS.danger }} />
+          <span style={{ fontFamily: bodyFont, fontSize: 10.5, fontWeight: 700, color: shopOpen ? COLORS.secondary : COLORS.danger }}>
+            {shopOpen ? `Open now \u00b7 Closes at ${formatTime12(deliverySettings.closeTime)}` : `Closed \u00b7 Opens at ${formatTime12(deliverySettings.openTime)}`}
+          </span>
+        </div>
+      )}
       <div className="px-4 py-3 relative">
         <form onSubmit={(e) => { e.preventDefault(); setFocused(false); onSearch(); }}>
           <div
@@ -653,19 +706,10 @@ function HomePage({ products, nav, onAdd, cart, area, categories }) {
   const recommended = [...products].sort((a, b) => b.rating - a.rating).slice(0, 8);
   return (
     <div className="pb-6">
-      <div className="mx-4 mt-1 mb-5 rounded-2xl p-5 relative overflow-hidden" style={{ background: `linear-gradient(120deg, ${COLORS.primary}, ${COLORS.rose})` }}>
-        <p style={{ fontFamily: bodyFont, fontSize: 11, color: '#FBE3B0', fontWeight: 700, letterSpacing: 0.5 }}>THIS WEEK ONLY</p>
-        <h2 style={{ fontFamily: displayFont, fontWeight: 700, fontStyle: 'italic', fontSize: 24, color: '#fff', marginTop: 4, lineHeight: 1.15 }}>Flat 20% off<br />on Skincare &amp; Makeup</h2>
-        <button onClick={() => nav('category', { id: 'offers' })} className="mt-4 px-4 py-2 rounded-full" style={{ background: '#fff', color: COLORS.primaryDark, fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>
-          Shop Now
-        </button>
-        <span className="absolute" style={{ right: -10, bottom: -20, fontSize: 90, opacity: 0.25 }}>&#128132;</span>
-      </div>
-
       <SectionHeader title="Shop by Category" />
-      <div className="grid grid-cols-4 gap-3 px-4 mb-6">
+      <div className="flex gap-4 px-4 mb-6 overflow-x-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         {categories.map((c) => (
-          <button key={c.id} onClick={() => nav('category', { id: c.id })} className="flex flex-col items-center gap-1.5">
+          <button key={c.id} onClick={() => nav('category', { id: c.id })} className="flex flex-col items-center gap-1.5 flex-shrink-0" style={{ width: 64 }}>
             <div className="rounded-2xl flex items-center justify-center" style={{ width: 56, height: 56, background: `${c.color}1A` }}>
               <c.Icon size={22} color={c.color} />
             </div>
@@ -863,11 +907,13 @@ function CheckoutPage({ cartItems, subtotal, deliverySettings, nav, placeOrder }
   const belowMin = subtotal < deliverySettings.minOrderValue;
   const deliveryCharge = subtotal >= deliverySettings.freeDeliveryThreshold ? 0 : deliverySettings.deliveryCharge;
   const total = subtotal + deliveryCharge;
+  const shopClosed = !isShopOpen(deliverySettings);
 
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
   const submit = async () => {
     setError('');
+    if (shopClosed) return setError(`We're currently closed. We reopen at ${formatTime12(deliverySettings.openTime)}.`);
     if (!form.name.trim()) return setError('Please enter your name.');
     if (!/^\d{10}$/.test(form.mobile)) return setError('Please enter a valid 10-digit mobile number.');
     if (!form.address.trim()) return setError('Please enter your delivery address.');
@@ -894,6 +940,12 @@ function CheckoutPage({ cartItems, subtotal, deliverySettings, nav, placeOrder }
 
   return (
     <div className="p-4 pb-32">
+      {shopClosed && (
+        <div className="flex items-center gap-2 mb-4 px-3 py-2.5 rounded-xl" style={{ background: '#FBEAE8' }}>
+          <AlertCircle size={15} color={COLORS.danger} />
+          <span style={{ fontFamily: bodyFont, fontSize: 12, color: COLORS.danger, fontWeight: 700 }}>We&rsquo;re currently closed. We reopen at {formatTime12(deliverySettings.openTime)}.</span>
+        </div>
+      )}
       <h2 style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 13, color: COLORS.ink, marginBottom: 8 }}>Delivery Details</h2>
       <div className="flex flex-col gap-2.5">
         <input value={form.name} onChange={set('name')} placeholder="Customer name" className="px-4 py-3 rounded-xl" style={{ border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none' }} />
@@ -960,8 +1012,8 @@ function CheckoutPage({ cartItems, subtotal, deliverySettings, nav, placeOrder }
 
       <div className="fixed left-0 right-0 flex justify-center z-40" style={{ bottom: 58 }}>
         <div className="w-full p-4" style={{ background: '#fff', borderTop: `1px solid ${COLORS.border}`, maxWidth: 448, boxShadow: '0 -6px 18px rgba(43,32,19,0.10)' }}>
-          <button onClick={submit} disabled={paying} className="w-full py-3.5 rounded-xl" style={{ background: paying ? COLORS.border : COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 14, boxShadow: paying ? 'none' : '0 4px 10px rgba(217,115,13,0.35)' }}>
-            {paying ? 'Opening payment...' : payment === 'online' && RAZORPAY_ENABLED ? `Pay ${money(total)} Now` : payment === 'upi' ? `Pay ${money(total)} via UPI` : `Place Order \u00b7 ${money(total)}`}
+          <button onClick={submit} disabled={paying || shopClosed} className="w-full py-3.5 rounded-xl" style={{ background: paying || shopClosed ? COLORS.border : COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 14, boxShadow: paying || shopClosed ? 'none' : '0 4px 10px rgba(217,115,13,0.35)' }}>
+            {shopClosed ? 'Store Closed' : paying ? 'Opening payment...' : payment === 'online' && RAZORPAY_ENABLED ? `Pay ${money(total)} Now` : payment === 'upi' ? `Pay ${money(total)} via UPI` : `Place Order \u00b7 ${money(total)}`}
           </button>
         </div>
       </div>
@@ -969,10 +1021,15 @@ function CheckoutPage({ cartItems, subtotal, deliverySettings, nav, placeOrder }
   );
 }
 
-function OrderSuccessPage({ order, nav, whatsappNumber }) {
+function OrderSuccessPage({ order, nav, whatsappNumber, orders, setOrders }) {
   if (!order) return null;
+  const liveOrder = (orders && orders.find((o) => o.id === order.id)) || order;
   const msg = `New order ${order.id} from ${order.name} (${order.mobile}).\nAddress: ${order.address}, ${order.pincode} (${order.area || ''}).\nItems:\n${order.items.map((i) => `- ${i.name} x${i.qty} = ${money(i.price * i.qty)}`).join('\n')}\nDelivery: ${order.deliveryCharge === 0 ? 'FREE' : money(order.deliveryCharge)}\nTotal: ${money(order.total)}\nPayment: ${paymentLabel(order.payment)}${order.paymentId ? ' (' + order.paymentId + ')' : ''}`;
   const waLink = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(msg)}`;
+  const canCancel = CANCELLABLE_STATUSES.includes(liveOrder.status);
+  const doCancel = () => {
+    if (window.confirm('Cancel this order? This cannot be undone.')) cancelOrderById(order.id, orders, setOrders);
+  };
   return (
     <div className="p-5 flex flex-col items-center pb-10">
       <div className="rounded-full flex items-center justify-center mb-3" style={{ width: 60, height: 60, background: '#EAF5F0' }}>
@@ -983,8 +1040,14 @@ function OrderSuccessPage({ order, nav, whatsappNumber }) {
       {order.paymentId && <p style={{ fontFamily: monoFont, fontSize: 10.5, color: COLORS.secondary, marginTop: 2 }}>Payment ref: {order.paymentId}</p>}
 
       <div className="w-full mt-6 rounded-2xl p-4" style={{ background: '#fff', border: `1px solid ${COLORS.border}` }}>
-        <StatusStepper status={order.status} />
+        <StatusStepper status={liveOrder.status} />
       </div>
+
+      {canCancel && (
+        <button onClick={doCancel} className="w-full mt-3 py-3 rounded-xl" style={{ border: `1px solid ${COLORS.danger}`, color: COLORS.danger, fontFamily: bodyFont, fontWeight: 700, fontSize: 13 }}>
+          Cancel Order
+        </button>
+      )}
 
       <div className="w-full mt-4 rounded-2xl p-4 flex flex-col gap-1.5" style={{ background: '#fff', border: `1px solid ${COLORS.border}` }}>
         {order.items.map((i) => (
@@ -1005,10 +1068,13 @@ function OrderSuccessPage({ order, nav, whatsappNumber }) {
   );
 }
 
-function MyOrdersPage({ orders, lastMobile }) {
+function MyOrdersPage({ orders, setOrders, lastMobile }) {
   const [mobile, setMobile] = useState(lastMobile || '');
   const [searched, setSearched] = useState(!!lastMobile);
   const list = orders.filter((o) => o.mobile === mobile).sort((a, b) => b.createdAt - a.createdAt);
+  const doCancel = (id) => {
+    if (window.confirm('Cancel this order? This cannot be undone.')) cancelOrderById(id, orders, setOrders);
+  };
   return (
     <div className="p-4 pb-10">
       <div className="flex gap-2 mb-4">
@@ -1030,6 +1096,11 @@ function MyOrdersPage({ orders, lastMobile }) {
             </div>
             <StatusStepper status={o.status} compact />
             <p style={{ ...clamp1, fontFamily: bodyFont, fontSize: 11.5, color: COLORS.inkSoft, marginTop: 10 }}>{o.items.map((i) => i.name).join(', ')}</p>
+            {CANCELLABLE_STATUSES.includes(o.status) && (
+              <button onClick={() => doCancel(o.id)} className="w-full mt-3 py-2 rounded-lg" style={{ border: `1px solid ${COLORS.danger}`, color: COLORS.danger, fontFamily: bodyFont, fontWeight: 700, fontSize: 11.5 }}>
+                Cancel Order
+              </button>
+            )}
           </div>
         ))}
       </div>
@@ -1316,8 +1387,9 @@ function AdminOrders({ orders, setOrders, whatsappNumber }) {
               <span style={{ fontFamily: monoFont, fontSize: 13, fontWeight: 700, color: COLORS.ink }}>{money(o.total)}</span>
               <Badge bg={o.payment === 'cod' ? COLORS.gold : o.payment === 'upi' ? COLORS.purple : COLORS.secondary}>{o.payment === 'cod' ? 'COD' : o.payment === 'upi' ? 'UPI' : 'ONLINE'}</Badge>
             </div>
-            <select value={o.status} onChange={(e) => update(o.id, e.target.value)} className="w-full px-3 py-2 rounded-lg" style={{ border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12, fontWeight: 700, color: COLORS.ink }}>
+            <select value={o.status} onChange={(e) => update(o.id, e.target.value)} className="w-full px-3 py-2 rounded-lg" style={{ border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12, fontWeight: 700, color: o.status === 'Cancelled' ? COLORS.danger : COLORS.ink }}>
               {STATUS_STEPS.map((s) => <option key={s} value={s}>{s}</option>)}
+              <option value="Cancelled">Cancelled</option>
             </select>
           </div>
         ))}
@@ -1336,6 +1408,7 @@ function AdminDelivery({ settings, setSettings }) {
         shop_name: local.shopName, shop_area: local.shopArea, shop_pincode: local.shopPincode, mode: local.mode,
         radius_km: local.radiusKm, min_order_value: local.minOrderValue, delivery_charge: local.deliveryCharge,
         free_delivery_threshold: local.freeDeliveryThreshold, whatsapp_number: local.whatsappNumber, upi_id: local.upiId,
+        open_time: local.openTime, close_time: local.closeTime,
       }).catch((e) => console.error('Delivery settings failed to sync:', e));
       const prevPins = new Set(settings.pincodes.map((p) => p.pincode));
       const nextPins = new Set(local.pincodes.map((p) => p.pincode));
@@ -1397,6 +1470,21 @@ function AdminDelivery({ settings, setSettings }) {
             <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft, marginTop: 6 }}>This preview estimates distance from a small demo lookup table. Connect a maps/geocoding API in production for precise, real-time radius checks.</p>
           </div>
         )}
+      </div>
+
+      <div className="rounded-2xl p-4 flex flex-col gap-3" style={{ background: '#fff', border: `1px solid ${COLORS.border}` }}>
+        <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>Store Timings</p>
+        <div className="flex gap-3">
+          <label className="flex-1 flex flex-col gap-1">
+            <span style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft, fontWeight: 700 }}>Opens at</span>
+            <input type="time" value={local.openTime} onChange={(e) => setLocal({ ...local, openTime: e.target.value })} className="px-3 py-2.5 rounded-lg" style={{ border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 12.5, outline: 'none' }} />
+          </label>
+          <label className="flex-1 flex flex-col gap-1">
+            <span style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft, fontWeight: 700 }}>Closes at</span>
+            <input type="time" value={local.closeTime} onChange={(e) => setLocal({ ...local, closeTime: e.target.value })} className="px-3 py-2.5 rounded-lg" style={{ border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 12.5, outline: 'none' }} />
+          </label>
+        </div>
+        <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft }}>Outside these hours the store shows as &ldquo;Closed&rdquo; to customers and new orders can&rsquo;t be placed.</p>
       </div>
 
       <div className="rounded-2xl p-4 grid grid-cols-1 gap-3" style={{ background: '#fff', border: `1px solid ${COLORS.border}` }}>
@@ -1694,7 +1782,7 @@ export default function App() {
           showBackHeader ? (
             <Header title={headerTitleMap[route.page] || ''} onBack={() => nav(route.page === 'product' ? 'home' : 'home')} />
           ) : (
-            <Header query={query} setQuery={setQuery} onSearch={runSearch} area={deliveryArea} onChangeLocation={() => setShowLocationModal(true)} shopName={deliverySettings.shopName} products={products} nav={nav} categories={allRealCategories} />
+            <Header query={query} setQuery={setQuery} onSearch={runSearch} area={deliveryArea} onChangeLocation={() => setShowLocationModal(true)} shopName={deliverySettings.shopName} products={products} nav={nav} categories={allRealCategories} deliverySettings={deliverySettings} />
           )
         )}
 
@@ -1710,8 +1798,8 @@ export default function App() {
               ? <CheckoutPage cartItems={cartItems} subtotal={subtotal} deliverySettings={deliverySettings} nav={nav} placeOrder={placeOrder} />
               : <div className="p-8 text-center" style={{ fontFamily: bodyFont, color: COLORS.inkSoft, fontSize: 13 }}>Your cart is empty.</div>
           )}
-          {route.page === 'ordersuccess' && <OrderSuccessPage order={lastOrder} nav={nav} whatsappNumber={deliverySettings.whatsappNumber} />}
-          {route.page === 'myorders' && <MyOrdersPage orders={orders} lastMobile={lastMobile} />}
+          {route.page === 'ordersuccess' && <OrderSuccessPage order={lastOrder} nav={nav} whatsappNumber={deliverySettings.whatsappNumber} orders={orders} setOrders={setOrders} />}
+          {route.page === 'myorders' && <MyOrdersPage orders={orders} setOrders={setOrders} lastMobile={lastMobile} />}
           {route.page === 'admin' && !isAdmin && <AdminLogin onLogin={() => setIsAdmin(true)} adminPassword={adminPassword} />}
           {route.page === 'admin' && isAdmin && (
             <AdminPage
