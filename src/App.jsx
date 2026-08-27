@@ -70,8 +70,8 @@ const monoFont = "'Space Mono', monospace";
    allow (see schema.sql). Until these are filled in, the app automatically keeps
    working exactly as before, using this browser's local storage as a stand-in.
 --------------------------------------------------------------------------------- */
-const SUPABASE_URL = '';       // e.g. 'https://xxxxxxxx.supabase.co'
-const SUPABASE_ANON_KEY = '';  // e.g. 'eyJhbGciOi...'
+const SUPABASE_URL = 'https://lmrplwuoudnpmzspnrdi.supabase.co';       // e.g. 'https://xxxxxxxx.supabase.co'
+const SUPABASE_ANON_KEY = 'sb_publishable_QP40LFHFW0tPAYOHoIiQyQ_QqLdoP_L';  // e.g. 'eyJhbGciOi...'
 const BACKEND_ENABLED = !!(SUPABASE_URL && SUPABASE_ANON_KEY);
 
 /* ------------------------------ PAYMENTS (Razorpay) -----------------------------
