@@ -198,6 +198,7 @@ function mapDeliveryFromDb(row, pinRows) {
     openTime: row.open_time || '09:00',
     closeTime: row.close_time || '21:00',
     productsSeeded: !!row.products_seeded,
+    adminPassword: row.admin_password || 'admin123',
     pincodes: (pinRows || []).map((p) => ({ pincode: p.pincode, area: p.area })),
   };
 }
@@ -1528,7 +1529,7 @@ function AdminSecurity({ adminPassword, setAdminPassword }) {
         <input type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} placeholder="Confirm new password" className="px-3 py-2.5 rounded-lg" style={{ border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }} />
         {msg && <p style={{ fontFamily: bodyFont, fontSize: 11.5, color: msg.type === 'error' ? COLORS.danger : COLORS.secondary }}>{msg.text}</p>}
         <button onClick={submit} className="py-2.5 rounded-lg" style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>Update Password</button>
-        <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft }}>This password is stored only in this browser, not shared across devices. For real multi-device admin login with proper security, the next upgrade is Supabase Auth (see SETUP.md).</p>
+        <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft }}>{BACKEND_ENABLED ? 'This password is shared across all browsers and devices.' : 'This password is stored only in this browser, not shared across devices, since Supabase isn\u2019t connected yet.'}</p>
       </div>
     </div>
   );
@@ -1657,7 +1658,11 @@ export default function App() {
           } else {
             setProducts([]);
           }
-          if (settingsRows && settingsRows[0]) setDeliverySettings(mapDeliveryFromDb(settingsRows[0], pinRows || []));
+          if (settingsRows && settingsRows[0]) {
+            const mapped = mapDeliveryFromDb(settingsRows[0], pinRows || []);
+            setDeliverySettings(mapped);
+            setAdminPassword(mapped.adminPassword);
+          }
         } catch (e) {
           console.error('Supabase load failed, showing local demo data instead:', e);
         }
@@ -1683,7 +1688,11 @@ export default function App() {
   useEffect(() => { if (loaded) window.storage.set('mm-orders', JSON.stringify(orders)).catch(() => {}); }, [orders, loaded]);
   useEffect(() => { if (loaded && !BACKEND_ENABLED) window.storage.set('mm-delivery', JSON.stringify(deliverySettings)).catch(() => {}); }, [deliverySettings, loaded]);
   useEffect(() => { if (loaded) window.storage.set('mm-cart', JSON.stringify(cart)).catch(() => {}); }, [cart, loaded]);
-  useEffect(() => { if (loaded) window.storage.set('mm-admin-pw', adminPassword).catch(() => {}); }, [adminPassword, loaded]);
+  useEffect(() => {
+    if (!loaded) return;
+    if (BACKEND_ENABLED) sbUpdate('delivery_settings', 'id=eq.1', { admin_password: adminPassword }).catch((e) => console.error('Admin password failed to sync:', e));
+    else window.storage.set('mm-admin-pw', adminPassword).catch(() => {});
+  }, [adminPassword, loaded]);
   useEffect(() => { if (loaded) window.storage.set('mm-custom-categories', JSON.stringify(customCategories)).catch(() => {}); }, [customCategories, loaded]);
 
   const nav = (page, params = {}) => { setRoute({ page, params }); window.scrollTo(0, 0); };
