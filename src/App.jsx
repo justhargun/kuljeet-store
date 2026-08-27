@@ -197,6 +197,7 @@ function mapDeliveryFromDb(row, pinRows) {
     upiId: row.upi_id || '',
     openTime: row.open_time || '09:00',
     closeTime: row.close_time || '21:00',
+    productsSeeded: !!row.products_seeded,
     pincodes: (pinRows || []).map((p) => ({ pincode: p.pincode, area: p.area })),
   };
 }
@@ -297,6 +298,7 @@ const SEED_DELIVERY = {
   upiId: '8433355769@nyes',
   openTime: '09:00',
   closeTime: '21:00',
+  productsSeeded: false,
 };
 // Demo-only distance lookup, used when the shop chooses radius-based delivery.
 // In production this would call a maps/geocoding API instead of a fixed table.
@@ -1633,12 +1635,14 @@ export default function App() {
             sbSelect('delivery_settings', '?select=*&id=eq.1'),
             sbSelect('delivery_pincodes', '?select=*'),
           ]);
+          const alreadySeeded = !!(settingsRows && settingsRows[0] && settingsRows[0].products_seeded);
           if (prodRows && prodRows.length) {
             setProducts(prodRows.map(mapProductFromDb));
-          } else {
-            // First-time setup: Supabase has no products yet, so push the built-in
-            // demo catalog into it once, and use the real database rows (with real
-            // UUIDs) from then on instead of the local-only demo ids.
+          } else if (!alreadySeeded) {
+            // First-time setup only: Supabase has no products yet and we've never
+            // seeded before, so push the built-in demo catalog into it once, and use
+            // the real database rows (with real UUIDs) from then on. If the shop
+            // owner later deletes all products on purpose, this will NOT run again.
             try {
               const seedRows = await sbInsert('products', SEED_PRODUCTS.map((p) => ({
                 category: p.category, name: p.name, price: p.price, mrp: p.mrp, stock: p.stock,
@@ -1646,9 +1650,12 @@ export default function App() {
                 is_new: p.isNew, deal: p.deal, description: p.desc, image_url: p.imageUrl || null,
               })));
               setProducts(seedRows.map(mapProductFromDb));
+              sbUpdate('delivery_settings', 'id=eq.1', { products_seeded: true }).catch((e) => console.error('Could not mark products as seeded:', e));
             } catch (e) {
               console.error('Could not seed Supabase with demo products, showing local demo data instead:', e);
             }
+          } else {
+            setProducts([]);
           }
           if (settingsRows && settingsRows[0]) setDeliverySettings(mapDeliveryFromDb(settingsRows[0], pinRows || []));
         } catch (e) {
