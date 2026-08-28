@@ -199,6 +199,14 @@ function mapDeliveryFromDb(row, pinRows) {
     closeTime: row.close_time || '21:00',
     productsSeeded: !!row.products_seeded,
     adminPassword: row.admin_password || 'admin123',
+    bannerEnabled: !!row.banner_enabled,
+    bannerTitle: row.banner_title || '',
+    bannerSubtitle: row.banner_subtitle || '',
+    bannerCta: row.banner_cta || 'Shop Now',
+    bannerCategory: row.banner_category || 'offers',
+    bannerEmoji: row.banner_emoji || '\ud83c\udf89',
+    bannerColor1: row.banner_color1 || '#D9730D',
+    bannerColor2: row.banner_color2 || '#B23A5C',
     pincodes: (pinRows || []).map((p) => ({ pincode: p.pincode, area: p.area })),
   };
 }
@@ -300,6 +308,14 @@ const SEED_DELIVERY = {
   openTime: '09:00',
   closeTime: '21:00',
   productsSeeded: false,
+  bannerEnabled: false,
+  bannerTitle: '',
+  bannerSubtitle: '',
+  bannerCta: 'Shop Now',
+  bannerCategory: 'offers',
+  bannerEmoji: '\ud83c\udf89',
+  bannerColor1: '#D9730D',
+  bannerColor2: '#B23A5C',
 };
 // Demo-only distance lookup, used when the shop chooses radius-based delivery.
 // In production this would call a maps/geocoding API instead of a fixed table.
@@ -702,13 +718,28 @@ function LocationModal({ onClose, onConfirm, deliverySettings }) {
 }
 
 /* ----------------------------------- PAGES ----------------------------------- */
-function HomePage({ products, nav, onAdd, cart, area, categories }) {
+function HomePage({ products, nav, onAdd, cart, area, categories, deliverySettings }) {
   const bestSellers = products.filter((p) => p.bestSeller);
   const newArrivals = products.filter((p) => p.isNew);
   const deals = products.filter((p) => p.deal);
   const recommended = [...products].sort((a, b) => b.rating - a.rating).slice(0, 8);
   return (
     <div className="pb-6">
+      {deliverySettings && deliverySettings.bannerEnabled && (
+        <div className="mx-4 mt-1 mb-5 rounded-2xl p-5 relative overflow-hidden" style={{ background: `linear-gradient(120deg, ${deliverySettings.bannerColor1}, ${deliverySettings.bannerColor2})` }}>
+          {deliverySettings.bannerTitle && (
+            <h2 style={{ fontFamily: displayFont, fontWeight: 700, fontStyle: 'italic', fontSize: 24, color: '#fff', lineHeight: 1.15 }}>{deliverySettings.bannerTitle}</h2>
+          )}
+          {deliverySettings.bannerSubtitle && (
+            <p style={{ fontFamily: bodyFont, fontSize: 13, color: '#fff', opacity: 0.92, marginTop: 4 }}>{deliverySettings.bannerSubtitle}</p>
+          )}
+          <button onClick={() => nav('category', { id: deliverySettings.bannerCategory })} className="mt-4 px-4 py-2 rounded-full" style={{ background: '#fff', color: COLORS.primaryDark, fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>
+            {deliverySettings.bannerCta || 'Shop Now'}
+          </button>
+          <span className="absolute" style={{ right: -10, bottom: -20, fontSize: 90, opacity: 0.25 }}>{deliverySettings.bannerEmoji}</span>
+        </div>
+      )}
+
       <SectionHeader title="Shop by Category" />
       <div className="flex gap-4 px-4 mb-6 overflow-x-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         {categories.map((c) => (
@@ -1462,7 +1493,7 @@ function AdminOrders({ orders, setOrders, whatsappNumber }) {
   );
 }
 
-function AdminDelivery({ settings, setSettings }) {
+function AdminDelivery({ settings, setSettings, categories }) {
   const [local, setLocal] = useState(settings);
   const [newPin, setNewPin] = useState({ pincode: '', area: '' });
   const save = () => {
@@ -1473,6 +1504,9 @@ function AdminDelivery({ settings, setSettings }) {
         radius_km: local.radiusKm, min_order_value: local.minOrderValue, delivery_charge: local.deliveryCharge,
         free_delivery_threshold: local.freeDeliveryThreshold, whatsapp_number: local.whatsappNumber, upi_id: local.upiId,
         open_time: local.openTime, close_time: local.closeTime,
+        banner_enabled: local.bannerEnabled, banner_title: local.bannerTitle, banner_subtitle: local.bannerSubtitle,
+        banner_cta: local.bannerCta, banner_category: local.bannerCategory, banner_emoji: local.bannerEmoji,
+        banner_color1: local.bannerColor1, banner_color2: local.bannerColor2,
       }).catch((e) => console.error('Delivery settings failed to sync:', e));
       const prevPins = new Set(settings.pincodes.map((p) => p.pincode));
       const nextPins = new Set(local.pincodes.map((p) => p.pincode));
@@ -1549,6 +1583,54 @@ function AdminDelivery({ settings, setSettings }) {
           </label>
         </div>
         <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft }}>Outside these hours the store shows as &ldquo;Closed&rdquo; to customers and new orders can&rsquo;t be placed.</p>
+      </div>
+
+      <div className="rounded-2xl p-4 flex flex-col gap-3" style={{ background: '#fff', border: `1px solid ${COLORS.border}` }}>
+        <div className="flex items-center justify-between">
+          <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>Festive Banner</p>
+          <button onClick={() => setLocal({ ...local, bannerEnabled: !local.bannerEnabled })} className="rounded-full" style={{ width: 42, height: 24, background: local.bannerEnabled ? COLORS.secondary : COLORS.border, position: 'relative', transition: 'background 0.15s' }}>
+            <div className="rounded-full" style={{ width: 18, height: 18, background: '#fff', position: 'absolute', top: 3, left: local.bannerEnabled ? 21 : 3, transition: 'left 0.15s' }} />
+          </button>
+        </div>
+        <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft, marginTop: -6 }}>Show a promotional banner at the top of the home page &mdash; turn it on for festivals or sales, off the rest of the time.</p>
+
+        {local.bannerEnabled && (
+          <div className="flex flex-col gap-3 mt-1">
+            {field('Title (e.g. Diwali Dhamaka)', local.bannerTitle, (e) => setLocal({ ...local, bannerTitle: e.target.value }))}
+            {field('Subtitle (e.g. Flat 25% off on Gift Hampers)', local.bannerSubtitle, (e) => setLocal({ ...local, bannerSubtitle: e.target.value }))}
+            <div className="flex gap-3">
+              {field('Button text', local.bannerCta, (e) => setLocal({ ...local, bannerCta: e.target.value }))}
+              {field('Emoji', local.bannerEmoji, (e) => setLocal({ ...local, bannerEmoji: e.target.value }))}
+            </div>
+            <label className="flex flex-col gap-1">
+              <span style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft, fontWeight: 700 }}>Button links to</span>
+              <select value={local.bannerCategory} onChange={(e) => setLocal({ ...local, bannerCategory: e.target.value })} className="px-3 py-2.5 rounded-lg" style={{ border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }}>
+                {(categories || []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </label>
+            <div>
+              <span style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft, fontWeight: 700 }}>Colour theme</span>
+              <div className="flex gap-2.5 mt-2">
+                {[
+                  { name: 'Sale', c1: '#D9730D', c2: '#B23A5C' },
+                  { name: 'Diwali', c1: '#C9971E', c2: '#8A1F1F' },
+                  { name: 'Holi', c1: '#C13584', c2: '#5B3A9B' },
+                  { name: 'Christmas', c1: '#146B3A', c2: '#B3282D' },
+                  { name: 'Fresh', c1: '#0E6E5C', c2: '#1E8F73' },
+                ].map((t) => (
+                  <button key={t.name} onClick={() => setLocal({ ...local, bannerColor1: t.c1, bannerColor2: t.c2 })} title={t.name} className="rounded-full" style={{ width: 30, height: 30, background: `linear-gradient(135deg, ${t.c1}, ${t.c2})`, border: local.bannerColor1 === t.c1 && local.bannerColor2 === t.c2 ? `2px solid ${COLORS.ink}` : '2px solid transparent' }} />
+                ))}
+              </div>
+            </div>
+            <div className="rounded-2xl p-4 relative overflow-hidden mt-1" style={{ background: `linear-gradient(120deg, ${local.bannerColor1}, ${local.bannerColor2})` }}>
+              <p style={{ fontFamily: bodyFont, fontSize: 10, color: '#FBE3B0', fontWeight: 700, letterSpacing: 0.5 }}>PREVIEW</p>
+              <h2 style={{ fontFamily: displayFont, fontWeight: 700, fontStyle: 'italic', fontSize: 20, color: '#fff', marginTop: 4, lineHeight: 1.15 }}>{local.bannerTitle || 'Your Banner Title'}</h2>
+              <p style={{ fontFamily: bodyFont, fontSize: 12, color: '#fff', opacity: 0.9, marginTop: 2 }}>{local.bannerSubtitle || 'Your banner subtitle goes here'}</p>
+              <button className="mt-3 px-4 py-2 rounded-full" style={{ background: '#fff', color: COLORS.primaryDark, fontFamily: bodyFont, fontWeight: 700, fontSize: 12 }}>{local.bannerCta || 'Shop Now'}</button>
+              <span className="absolute" style={{ right: -6, bottom: -14, fontSize: 64, opacity: 0.3 }}>{local.bannerEmoji || '\ud83c\udf89'}</span>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="rounded-2xl p-4 grid grid-cols-1 gap-3" style={{ background: '#fff', border: `1px solid ${COLORS.border}` }}>
@@ -1640,7 +1722,7 @@ function AdminPage({ products, setProducts, orders, setOrders, deliverySettings,
       {tab === 'overview' && <AdminOverview products={products} orders={orders} />}
       {tab === 'products' && <AdminProducts products={products} setProducts={setProducts} categories={allRealCategories} customCategories={customCategories} setCustomCategories={setCustomCategories} />}
       {tab === 'orders' && <AdminOrders orders={orders} setOrders={setOrders} whatsappNumber={deliverySettings.whatsappNumber} />}
-      {tab === 'delivery' && <AdminDelivery settings={deliverySettings} setSettings={setDeliverySettings} />}
+      {tab === 'delivery' && <AdminDelivery settings={deliverySettings} setSettings={setDeliverySettings} categories={allRealCategories} />}
       {tab === 'customers' && <AdminCustomers orders={orders} />}
       {tab === 'security' && <AdminSecurity adminPassword={adminPassword} setAdminPassword={setAdminPassword} />}
     </div>
@@ -1881,7 +1963,7 @@ export default function App() {
         )}
 
         <div className="flex-1">
-          {route.page === 'home' && <HomePage products={products} nav={nav} onAdd={addToCart} cart={cart} area={deliveryArea} categories={allCategories} />}
+          {route.page === 'home' && <HomePage products={products} nav={nav} onAdd={addToCart} cart={cart} area={deliveryArea} categories={allCategories} deliverySettings={deliverySettings} />}
           {route.page === 'categories' && <CategoriesPage nav={nav} categories={allRealCategories} />}
           {route.page === 'category' && <ProductListPage products={categoryProducts} nav={nav} onAdd={addToCart} cart={cart} />}
           {route.page === 'list' && <ProductListPage products={listProducts} nav={nav} onAdd={addToCart} cart={cart} />}
