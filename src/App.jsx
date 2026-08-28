@@ -739,6 +739,10 @@ function HomePage({ products, nav, onAdd, cart, area, categories }) {
           <ProductCard key={p.id} product={p} onOpen={(pr) => nav('product', { id: pr.id })} onAdd={onAdd} qty={cart[p.id] || 0} />
         ))}
       </div>
+
+      <button onClick={() => nav('about')} className="w-full mt-7 py-3.5 flex items-center justify-center gap-1.5" style={{ borderTop: `1px solid ${COLORS.border}`, color: COLORS.inkSoft, fontFamily: bodyFont, fontSize: 12, fontWeight: 600 }}>
+        About Us & Contact <ChevronRight size={14} />
+      </button>
     </div>
   );
 }
@@ -1106,6 +1110,63 @@ function MyOrdersPage({ orders, setOrders, lastMobile }) {
             )}
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function AboutPage({ deliverySettings }) {
+  const shopOpen = isShopOpen(deliverySettings);
+  const waMsg = encodeURIComponent(`Hi ${deliverySettings.shopName || 'Kuljeet Store'}, I have a question about your store.`);
+  return (
+    <div className="p-4 pb-10 flex flex-col gap-5">
+      <div className="rounded-2xl p-5 flex flex-col items-center text-center gap-2" style={{ background: `linear-gradient(135deg, ${COLORS.primary}1A, ${COLORS.rose}1A)`, border: `1px solid ${COLORS.border}` }}>
+        <div className="rounded-2xl flex items-center justify-center" style={{ width: 56, height: 56, background: `linear-gradient(135deg, ${COLORS.primary}, ${COLORS.rose})` }}>
+          <ShoppingBasket size={26} color="#fff" />
+        </div>
+        <h2 style={{ fontFamily: displayFont, fontWeight: 700, fontStyle: 'italic', fontSize: 19, color: COLORS.ink }}>{deliverySettings.shopName || 'Kuljeet Store'}</h2>
+        <p style={{ fontFamily: bodyFont, fontSize: 12, color: COLORS.inkSoft }}>your neighbourhood, delivered</p>
+        <div className="flex items-center gap-1.5 mt-1">
+          <div className="rounded-full" style={{ width: 6, height: 6, background: shopOpen ? COLORS.secondary : COLORS.danger }} />
+          <span style={{ fontFamily: bodyFont, fontSize: 11, fontWeight: 700, color: shopOpen ? COLORS.secondary : COLORS.danger }}>
+            {shopOpen ? `Open now \u00b7 Closes at ${formatTime12(deliverySettings.closeTime)}` : `Closed \u00b7 Opens at ${formatTime12(deliverySettings.openTime)}`}
+          </span>
+        </div>
+      </div>
+
+      <div>
+        <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 13, color: COLORS.ink, marginBottom: 6 }}>About Us</p>
+        <p style={{ fontFamily: bodyFont, fontSize: 12.5, color: COLORS.inkSoft, lineHeight: 1.6 }}>
+          We're your local neighbourhood store, bringing everyday essentials, skincare, makeup, and household items
+          straight to your door. We pick every order carefully and get it to you fast, because we know your time matters.
+          Thank you for shopping with us and supporting a local business.
+        </p>
+      </div>
+
+      <div>
+        <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 13, color: COLORS.ink, marginBottom: 10 }}>Contact Us</p>
+        <div className="flex flex-col gap-2.5">
+          <a href={`https://wa.me/${deliverySettings.whatsappNumber}?text=${waMsg}`} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-xl p-3.5" style={{ background: '#fff', border: `1px solid ${COLORS.border}` }}>
+            <div className="rounded-full flex items-center justify-center" style={{ width: 36, height: 36, background: '#25D3661A' }}>
+              <MessageCircle size={17} color="#25D366" />
+            </div>
+            <div className="flex-1">
+              <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>Chat on WhatsApp</p>
+              <p style={{ fontFamily: monoFont, fontSize: 11.5, color: COLORS.inkSoft }}>+{deliverySettings.whatsappNumber}</p>
+            </div>
+            <ChevronRight size={16} color={COLORS.inkSoft} />
+          </a>
+          <a href={`tel:+${deliverySettings.whatsappNumber}`} className="flex items-center gap-3 rounded-xl p-3.5" style={{ background: '#fff', border: `1px solid ${COLORS.border}` }}>
+            <div className="rounded-full flex items-center justify-center" style={{ width: 36, height: 36, background: `${COLORS.primary}1A` }}>
+              <Smartphone size={17} color={COLORS.primary} />
+            </div>
+            <div className="flex-1">
+              <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>Call Us</p>
+              <p style={{ fontFamily: monoFont, fontSize: 11.5, color: COLORS.inkSoft }}>+{deliverySettings.whatsappNumber}</p>
+            </div>
+            <ChevronRight size={16} color={COLORS.inkSoft} />
+          </a>
+        </div>
       </div>
     </div>
   );
@@ -1778,13 +1839,14 @@ export default function App() {
 
   const isAdminRoute = route.page === 'admin';
   const showHeader = !isAdminRoute && route.page !== 'product' && route.page !== 'checkout';
-  const showBackHeader = route.page === 'category' || route.page === 'product' || route.page === 'checkout' || route.page === 'list';
+  const showBackHeader = route.page === 'category' || route.page === 'product' || route.page === 'checkout' || route.page === 'list' || route.page === 'about';
 
   const headerTitleMap = {
     category: allCategories.find((c) => c.id === route.params.id)?.name,
     product: currentProduct?.name,
     checkout: 'Checkout',
     list: listTitle,
+    about: 'About Us & Contact',
   };
 
   if (!loaded) {
@@ -1832,6 +1894,7 @@ export default function App() {
           )}
           {route.page === 'ordersuccess' && <OrderSuccessPage order={lastOrder} nav={nav} whatsappNumber={deliverySettings.whatsappNumber} orders={orders} setOrders={setOrders} />}
           {route.page === 'myorders' && <MyOrdersPage orders={orders} setOrders={setOrders} lastMobile={lastMobile} />}
+          {route.page === 'about' && <AboutPage deliverySettings={deliverySettings} />}
           {route.page === 'admin' && !isAdmin && <AdminLogin onLogin={() => setIsAdmin(true)} adminPassword={adminPassword} />}
           {route.page === 'admin' && isAdmin && (
             <AdminPage
