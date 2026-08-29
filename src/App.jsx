@@ -5,7 +5,7 @@ import {
   Wind, Heart, Palette, Baby, Sun, Tag, Lock, Truck, CreditCard, Banknote,
   MessageCircle, Trash2, PlusCircle, BarChart3, Users,
   ClipboardList, AlertCircle, CheckCircle2, ArrowLeft,
-  LogOut, Flower, ShoppingBasket, Smartphone, ImagePlus, KeyRound
+  LogOut, Flower, ShoppingBasket, Smartphone, ImagePlus, KeyRound, Moon
 } from 'lucide-react';
 
 if (typeof window !== 'undefined' && !window.storage) {
@@ -43,7 +43,7 @@ if (typeof window !== 'undefined' && !window.storage) {
 }
 
 /* ---------------------------------- THEME ---------------------------------- */
-const COLORS = {
+const LIGHT_THEME = {
   bg: '#FBF6EC',
   card: '#FFFFFF',
   ink: '#2B2013',
@@ -58,7 +58,33 @@ const COLORS = {
   cream: '#FFF9EE',
   purple: '#6B4A9E',
   blue: '#3E7FB0',
+  dangerTint: '#FBEAE8',
+  successTint: '#EAF5F0',
 };
+const DARK_THEME = {
+  bg: '#18140F',
+  card: '#241E17',
+  ink: '#F3ECDD',
+  inkSoft: '#B0A088',
+  border: '#3A3226',
+  primary: '#E98A2E',
+  primaryDark: '#F0A250',
+  secondary: '#2E9C84',
+  rose: '#D65C82',
+  gold: '#E0AA3D',
+  danger: '#E2685D',
+  cream: '#2A2419',
+  purple: '#9B7BC9',
+  blue: '#6FA8D8',
+  dangerTint: '#3D2420',
+  successTint: '#1D3830',
+};
+// COLORS is a single mutable object (not reassigned) so every component reading
+// COLORS.xxx at render time picks up whichever theme is currently active.
+const COLORS = { ...LIGHT_THEME };
+function applyTheme(mode) {
+  Object.assign(COLORS, mode === 'dark' ? DARK_THEME : LIGHT_THEME);
+}
 const displayFont = "'Fraunces', Georgia, serif";
 const bodyFont = "'Manrope', system-ui, sans-serif";
 const monoFont = "'Space Mono', monospace";
@@ -356,6 +382,7 @@ function isShopOpen(settings) {
 }
 
 const STATUS_STEPS = ['Order Received', 'Confirmed', 'Packing', 'Out for Delivery', 'Delivered'];
+const LOW_STOCK_THRESHOLD = 5;
 const CANCELLABLE_STATUSES = ['Order Received', 'Confirmed'];
 function cancelOrderById(id, orders, setOrders) {
   setOrders(orders.map((o) => (o.id === id ? { ...o, status: 'Cancelled' } : o)));
@@ -407,7 +434,7 @@ function StatusStepper({ status, compact }) {
             {i < idx || (i === idx && status === 'Delivered') ? (
               <Check size={compact ? 11 : 14} color="#fff" />
             ) : i === idx ? (
-              <div className="rounded-full" style={{ width: 7, height: 7, background: '#fff' }} />
+              <div className="rounded-full" style={{ width: 7, height: 7, background: COLORS.card }} />
             ) : null}
           </div>
           {!compact && (
@@ -445,6 +472,7 @@ function ProductCard({ product, onOpen, onAdd, qty }) {
         )}
         <div className="absolute top-2 left-2 flex flex-col gap-1 items-start">
           {product.isNew && <Badge bg={COLORS.secondary}>NEW</Badge>}
+          {product.stock > 0 && product.stock <= LOW_STOCK_THRESHOLD && <Badge bg={COLORS.gold} color={COLORS.ink}>ONLY {product.stock} LEFT</Badge>}
         </div>
         {off > 0 && (
           <div className="absolute top-2 right-2">
@@ -508,7 +536,7 @@ function Rail({ products, onOpen, onAdd, cart }) {
 }
 
 /* --------------------------------- HEADER / NAV --------------------------------- */
-function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack, title, shopName, products = [], nav, categories = [], deliverySettings }) {
+function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack, title, shopName, products = [], nav, categories = [], deliverySettings, theme, setTheme }) {
   const [focused, setFocused] = useState(false);
   const shopOpen = deliverySettings ? isShopOpen(deliverySettings) : true;
 
@@ -546,11 +574,18 @@ function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack
             <p style={{ fontFamily: bodyFont, fontSize: 10, color: COLORS.inkSoft }}>your neighbourhood, delivered</p>
           </div>
         </div>
-        <button onClick={onChangeLocation} className="flex items-center gap-1 px-2.5 py-1.5 rounded-full" style={{ background: COLORS.cream, border: `1px solid ${COLORS.border}` }}>
-          <MapPin size={13} color={COLORS.secondary} />
-          <span style={{ fontFamily: bodyFont, fontSize: 11, fontWeight: 700, color: COLORS.ink, maxWidth: 78, ...clamp1 }}>{area || 'Set location'}</span>
-          <ChevronDown size={12} color={COLORS.inkSoft} />
-        </button>
+        <div className="flex items-center gap-2">
+          {setTheme && (
+            <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="flex items-center justify-center rounded-full" style={{ width: 30, height: 30, background: COLORS.cream, border: `1px solid ${COLORS.border}` }}>
+              {theme === 'dark' ? <Sun size={14} color={COLORS.gold} /> : <Moon size={14} color={COLORS.secondary} />}
+            </button>
+          )}
+          <button onClick={onChangeLocation} className="flex items-center gap-1 px-2.5 py-1.5 rounded-full" style={{ background: COLORS.cream, border: `1px solid ${COLORS.border}` }}>
+            <MapPin size={13} color={COLORS.secondary} />
+            <span style={{ fontFamily: bodyFont, fontSize: 11, fontWeight: 700, color: COLORS.ink, maxWidth: 78, ...clamp1 }}>{area || 'Set location'}</span>
+            <ChevronDown size={12} color={COLORS.inkSoft} />
+          </button>
+        </div>
       </div>
       {deliverySettings && (
         <div className="px-4 pt-2 flex items-center gap-1.5">
@@ -565,7 +600,7 @@ function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack
           <div
             className="flex items-center gap-2 px-3 py-2.5"
             style={{
-              background: '#fff', border: `1.5px solid ${focused ? COLORS.primary : COLORS.border}`,
+              background: COLORS.card, border: `1.5px solid ${focused ? COLORS.primary : COLORS.border}`,
               borderRadius: hasSuggestions ? '14px 14px 0 0' : 14,
               boxShadow: focused ? '0 4px 14px rgba(217,115,13,0.12)' : 'none',
               transition: 'border-color 120ms ease, box-shadow 120ms ease',
@@ -591,7 +626,7 @@ function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack
         {hasSuggestions && (
           <div
             className="absolute left-4 right-4 overflow-hidden z-30"
-            style={{ top: '100%', marginTop: -1, background: '#fff', border: `1.5px solid ${COLORS.primary}`, borderTop: 'none', borderRadius: '0 0 14px 14px', boxShadow: '0 10px 24px rgba(43,32,19,0.12)' }}
+            style={{ top: '100%', marginTop: -1, background: COLORS.card, border: `1.5px solid ${COLORS.primary}`, borderTop: 'none', borderRadius: '0 0 14px 14px', boxShadow: '0 10px 24px rgba(43,32,19,0.12)' }}
           >
             {suggestions.categories.length > 0 && (
               <div className="px-3 pt-2.5 pb-1 flex gap-1.5 flex-wrap">
@@ -648,7 +683,7 @@ function BottomNav({ page, nav, cartCount }) {
     { id: 'admin', label: 'Admin', Icon: Lock },
   ];
   return (
-    <div className="sticky bottom-0 z-30 flex items-stretch" style={{ background: '#fff', borderTop: `1px solid ${COLORS.border}` }}>
+    <div className="sticky bottom-0 z-30 flex items-stretch" style={{ background: COLORS.card, borderTop: `1px solid ${COLORS.border}` }}>
       {items.map((it) => {
         const active = page === it.id || (it.id === 'admin' && page.startsWith('admin'));
         return (
@@ -678,7 +713,7 @@ function LocationModal({ onClose, onConfirm, deliverySettings }) {
   }, [pin]);
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(43,32,19,0.45)' }}>
-      <div className="w-full rounded-t-3xl p-5" style={{ background: '#fff', maxWidth: 448 }}>
+      <div className="w-full rounded-t-3xl p-5" style={{ background: COLORS.card, maxWidth: 448 }}>
         <div className="flex items-center justify-between mb-3">
           <h2 style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 18, color: COLORS.ink }}>Delivering to your door</h2>
           <button onClick={onClose}><X size={20} color={COLORS.inkSoft} /></button>
@@ -692,13 +727,13 @@ function LocationModal({ onClose, onConfirm, deliverySettings }) {
           style={{ border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 15, outline: 'none' }}
         />
         {result && result.allowed && (
-          <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl mb-3" style={{ background: '#EAF5F0' }}>
+          <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl mb-3" style={{ background: COLORS.successTint }}>
             <CheckCircle2 size={16} color={COLORS.secondary} />
             <span style={{ fontFamily: bodyFont, fontSize: 12.5, color: COLORS.secondary, fontWeight: 700 }}>We deliver here{result.area ? ' \u2014 ' + result.area : ''}!</span>
           </div>
         )}
         {result && !result.allowed && (
-          <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl mb-3" style={{ background: '#FBEAE8' }}>
+          <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl mb-3" style={{ background: COLORS.dangerTint }}>
             <AlertCircle size={16} color={COLORS.danger} />
             <span style={{ fontFamily: bodyFont, fontSize: 12.5, color: COLORS.danger, fontWeight: 700 }}>Sorry, we currently don&rsquo;t deliver to this location.</span>
           </div>
@@ -733,7 +768,7 @@ function HomePage({ products, nav, onAdd, cart, area, categories, deliverySettin
           {deliverySettings.bannerSubtitle && (
             <p style={{ fontFamily: bodyFont, fontSize: 13, color: '#fff', opacity: 0.92, marginTop: 4 }}>{deliverySettings.bannerSubtitle}</p>
           )}
-          <button onClick={() => nav('category', { id: deliverySettings.bannerCategory })} className="mt-4 px-4 py-2 rounded-full" style={{ background: '#fff', color: COLORS.primaryDark, fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>
+          <button onClick={() => nav('category', { id: deliverySettings.bannerCategory })} className="mt-4 px-4 py-2 rounded-full" style={{ background: COLORS.card, color: COLORS.primaryDark, fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>
             {deliverySettings.bannerCta || 'Shop Now'}
           </button>
           <span className="absolute" style={{ right: -10, bottom: -20, fontSize: 90, opacity: 0.25 }}>{deliverySettings.bannerEmoji}</span>
@@ -836,8 +871,8 @@ function ProductPage({ product, nav, onAdd, onBuyNow, qty }) {
           <Star size={13} fill={COLORS.gold} color={COLORS.gold} />
           <span style={{ fontFamily: bodyFont, fontSize: 12.5, color: COLORS.inkSoft }}>{product.rating} rating</span>
           <span style={{ color: COLORS.border }}>&bull;</span>
-          <span style={{ fontFamily: bodyFont, fontSize: 12.5, color: product.stock > 0 ? COLORS.secondary : COLORS.danger, fontWeight: 700 }}>
-            {product.stock > 0 ? `${product.stock} in stock` : 'Out of stock'}
+          <span style={{ fontFamily: bodyFont, fontSize: 12.5, color: product.stock === 0 ? COLORS.danger : product.stock <= LOW_STOCK_THRESHOLD ? '#B8860B' : COLORS.secondary, fontWeight: 700 }}>
+            {product.stock === 0 ? 'Out of stock' : product.stock <= LOW_STOCK_THRESHOLD ? `Only ${product.stock} left \u2014 order soon` : `${product.stock} in stock`}
           </span>
         </div>
         <div className="mt-4"><PriceTag price={product.price} mrp={product.mrp} size="lg" /></div>
@@ -859,7 +894,7 @@ function ProductPage({ product, nav, onAdd, onBuyNow, qty }) {
       </div>
 
       <div className="fixed left-0 right-0 flex justify-center z-40" style={{ bottom: 58 }}>
-        <div className="w-full flex gap-3 p-3" style={{ background: '#fff', borderTop: `1px solid ${COLORS.border}`, maxWidth: 448, boxShadow: '0 -6px 18px rgba(43,32,19,0.10)' }}>
+        <div className="w-full flex gap-3 p-3" style={{ background: COLORS.card, borderTop: `1px solid ${COLORS.border}`, maxWidth: 448, boxShadow: '0 -6px 18px rgba(43,32,19,0.10)' }}>
           <button
             onClick={() => onAdd(product, n)}
             disabled={product.stock === 0}
@@ -897,7 +932,7 @@ function CartPage({ cartItems, updateQty, removeItem, subtotal, nav }) {
     <div className="pb-32">
       <div className="p-4 flex flex-col gap-3">
         {cartItems.map((item) => (
-          <div key={item.id} className="flex gap-3 p-3 rounded-2xl" style={{ background: '#fff', border: `1px solid ${COLORS.border}` }}>
+          <div key={item.id} className="flex gap-3 p-3 rounded-2xl" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
             <div className="rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden" style={{ width: 56, height: 56, background: item.imageUrl ? '#fff' : `linear-gradient(135deg, ${item.g1}, ${item.g2})` }}>
               {item.imageUrl ? <img src={item.imageUrl} alt={item.name} className="w-full h-full" style={{ objectFit: 'cover' }} /> : <span style={{ fontSize: 24 }}>{item.emoji}</span>}
             </div>
@@ -918,7 +953,7 @@ function CartPage({ cartItems, updateQty, removeItem, subtotal, nav }) {
         ))}
       </div>
       <div className="fixed left-0 right-0 flex justify-center z-40" style={{ bottom: 58 }}>
-        <div className="w-full p-4 rounded-t-2xl" style={{ background: '#fff', borderTop: `1px solid ${COLORS.border}`, maxWidth: 448, boxShadow: '0 -6px 18px rgba(43,32,19,0.10)' }}>
+        <div className="w-full p-4 rounded-t-2xl" style={{ background: COLORS.card, borderTop: `1px solid ${COLORS.border}`, maxWidth: 448, boxShadow: '0 -6px 18px rgba(43,32,19,0.10)' }}>
           <div className="flex items-center justify-between mb-3">
             <span style={{ fontFamily: bodyFont, fontSize: 13, color: COLORS.inkSoft }}>Subtotal</span>
             <span style={{ fontFamily: monoFont, fontSize: 16, fontWeight: 700, color: COLORS.ink }}>{money(subtotal)}</span>
@@ -979,26 +1014,26 @@ function CheckoutPage({ cartItems, subtotal, deliverySettings, nav, placeOrder }
   return (
     <div className="p-4 pb-32">
       {shopClosed && (
-        <div className="flex items-center gap-2 mb-4 px-3 py-2.5 rounded-xl" style={{ background: '#FBEAE8' }}>
+        <div className="flex items-center gap-2 mb-4 px-3 py-2.5 rounded-xl" style={{ background: COLORS.dangerTint }}>
           <AlertCircle size={15} color={COLORS.danger} />
           <span style={{ fontFamily: bodyFont, fontSize: 12, color: COLORS.danger, fontWeight: 700 }}>We&rsquo;re currently closed. We reopen at {formatTime12(deliverySettings.openTime)}.</span>
         </div>
       )}
       <h2 style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 13, color: COLORS.ink, marginBottom: 8 }}>Delivery Details</h2>
       <div className="flex flex-col gap-2.5">
-        <input value={form.name} onChange={set('name')} placeholder="Customer name" className="px-4 py-3 rounded-xl" style={{ border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none' }} />
-        <input value={form.mobile} onChange={(e) => setForm({ ...form, mobile: e.target.value.replace(/\D/g, '').slice(0, 10) })} placeholder="Mobile number" className="px-4 py-3 rounded-xl" style={{ border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 13, outline: 'none' }} />
-        <textarea value={form.address} onChange={set('address')} placeholder="Delivery address (house no, street, landmark)" rows={3} className="px-4 py-3 rounded-xl" style={{ border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none', resize: 'none' }} />
-        <input value={form.pincode} onChange={(e) => setForm({ ...form, pincode: e.target.value.replace(/\D/g, '').slice(0, 6) })} placeholder="Pincode" className="px-4 py-3 rounded-xl" style={{ border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 13, outline: 'none' }} />
+        <input value={form.name} onChange={set('name')} placeholder="Customer name" className="px-4 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none' }} />
+        <input value={form.mobile} onChange={(e) => setForm({ ...form, mobile: e.target.value.replace(/\D/g, '').slice(0, 10) })} placeholder="Mobile number" className="px-4 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 13, outline: 'none' }} />
+        <textarea value={form.address} onChange={set('address')} placeholder="Delivery address (house no, street, landmark)" rows={3} className="px-4 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none', resize: 'none' }} />
+        <input value={form.pincode} onChange={(e) => setForm({ ...form, pincode: e.target.value.replace(/\D/g, '').slice(0, 6) })} placeholder="Pincode" className="px-4 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 13, outline: 'none' }} />
 
         {zone && zone.allowed && (
-          <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ background: '#EAF5F0' }}>
+          <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ background: COLORS.successTint }}>
             <CheckCircle2 size={15} color={COLORS.secondary} />
             <span style={{ fontFamily: bodyFont, fontSize: 12, color: COLORS.secondary, fontWeight: 700 }}>Great news, we deliver to {zone.area || 'your area'}!</span>
           </div>
         )}
         {zone && !zone.allowed && (
-          <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ background: '#FBEAE8' }}>
+          <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ background: COLORS.dangerTint }}>
             <AlertCircle size={15} color={COLORS.danger} />
             <span style={{ fontFamily: bodyFont, fontSize: 12, color: COLORS.danger, fontWeight: 700 }}>Sorry, we currently don&rsquo;t deliver to this location.</span>
           </div>
@@ -1030,7 +1065,7 @@ function CheckoutPage({ cartItems, subtotal, deliverySettings, nav, placeOrder }
         )}
       </div>
 
-      <div className="mt-5 rounded-2xl p-4" style={{ background: '#fff', border: `1px solid ${COLORS.border}` }}>
+      <div className="mt-5 rounded-2xl p-4" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
         <div className="flex justify-between mb-1.5"><span style={{ fontFamily: bodyFont, fontSize: 12.5, color: COLORS.inkSoft }}>Subtotal</span><span style={{ fontFamily: monoFont, fontSize: 12.5, color: COLORS.ink }}>{money(subtotal)}</span></div>
         <div className="flex justify-between mb-1.5"><span style={{ fontFamily: bodyFont, fontSize: 12.5, color: COLORS.inkSoft }}>Delivery charge</span><span style={{ fontFamily: monoFont, fontSize: 12.5, color: deliveryCharge === 0 ? COLORS.secondary : COLORS.ink }}>{deliveryCharge === 0 ? 'FREE' : money(deliveryCharge)}</span></div>
         {belowMin && <p style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.danger, marginBottom: 6 }}>Minimum order value is {money(deliverySettings.minOrderValue)}. Add {money(deliverySettings.minOrderValue - subtotal)} more.</p>}
@@ -1042,14 +1077,14 @@ function CheckoutPage({ cartItems, subtotal, deliverySettings, nav, placeOrder }
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 mt-3 px-3 py-2.5 rounded-xl" style={{ background: '#FBEAE8' }}>
+        <div className="flex items-center gap-2 mt-3 px-3 py-2.5 rounded-xl" style={{ background: COLORS.dangerTint }}>
           <AlertCircle size={15} color={COLORS.danger} />
           <span style={{ fontFamily: bodyFont, fontSize: 12, color: COLORS.danger }}>{error}</span>
         </div>
       )}
 
       <div className="fixed left-0 right-0 flex justify-center z-40" style={{ bottom: 58 }}>
-        <div className="w-full p-4" style={{ background: '#fff', borderTop: `1px solid ${COLORS.border}`, maxWidth: 448, boxShadow: '0 -6px 18px rgba(43,32,19,0.10)' }}>
+        <div className="w-full p-4" style={{ background: COLORS.card, borderTop: `1px solid ${COLORS.border}`, maxWidth: 448, boxShadow: '0 -6px 18px rgba(43,32,19,0.10)' }}>
           <button onClick={submit} disabled={paying || shopClosed} className="w-full py-3.5 rounded-xl" style={{ background: paying || shopClosed ? COLORS.border : COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 14, boxShadow: paying || shopClosed ? 'none' : '0 4px 10px rgba(217,115,13,0.35)' }}>
             {shopClosed ? 'Store Closed' : paying ? 'Opening payment...' : payment === 'online' && RAZORPAY_ENABLED ? `Pay ${money(total)} Now` : payment === 'upi' ? `Pay ${money(total)} via UPI` : `Place Order \u00b7 ${money(total)}`}
           </button>
@@ -1070,14 +1105,14 @@ function OrderSuccessPage({ order, nav, whatsappNumber, orders, setOrders }) {
   };
   return (
     <div className="p-5 flex flex-col items-center pb-10">
-      <div className="rounded-full flex items-center justify-center mb-3" style={{ width: 60, height: 60, background: '#EAF5F0' }}>
+      <div className="rounded-full flex items-center justify-center mb-3" style={{ width: 60, height: 60, background: COLORS.successTint }}>
         <CheckCircle2 size={32} color={COLORS.secondary} />
       </div>
       <h2 style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 19, color: COLORS.ink }}>Order Placed!</h2>
       <p style={{ fontFamily: bodyFont, fontSize: 12.5, color: COLORS.inkSoft, marginTop: 2 }}>Order ID: {order.id}</p>
       {order.paymentId && <p style={{ fontFamily: monoFont, fontSize: 10.5, color: COLORS.secondary, marginTop: 2 }}>Payment ref: {order.paymentId}</p>}
 
-      <div className="w-full mt-6 rounded-2xl p-4" style={{ background: '#fff', border: `1px solid ${COLORS.border}` }}>
+      <div className="w-full mt-6 rounded-2xl p-4" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
         <StatusStepper status={liveOrder.status} />
       </div>
 
@@ -1087,7 +1122,7 @@ function OrderSuccessPage({ order, nav, whatsappNumber, orders, setOrders }) {
         </button>
       )}
 
-      <div className="w-full mt-4 rounded-2xl p-4 flex flex-col gap-1.5" style={{ background: '#fff', border: `1px solid ${COLORS.border}` }}>
+      <div className="w-full mt-4 rounded-2xl p-4 flex flex-col gap-1.5" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
         {order.items.map((i) => (
           <div key={i.id} className="flex justify-between"><span style={{ fontFamily: bodyFont, fontSize: 12, color: COLORS.ink }}>{i.name} &times; {i.qty}</span><span style={{ fontFamily: monoFont, fontSize: 12, color: COLORS.ink }}>{money(i.price * i.qty)}</span></div>
         ))}
@@ -1116,7 +1151,7 @@ function MyOrdersPage({ orders, setOrders, lastMobile }) {
   return (
     <div className="p-4 pb-10">
       <div className="flex gap-2 mb-4">
-        <input value={mobile} onChange={(e) => setMobile(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="Enter your mobile number" className="flex-1 px-4 py-3 rounded-xl" style={{ border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 13, outline: 'none' }} />
+        <input value={mobile} onChange={(e) => setMobile(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="Enter your mobile number" className="flex-1 px-4 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 13, outline: 'none' }} />
         <button onClick={() => setSearched(true)} className="px-4 rounded-xl" style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>Find</button>
       </div>
       {searched && !list.length && (
@@ -1127,7 +1162,7 @@ function MyOrdersPage({ orders, setOrders, lastMobile }) {
       )}
       <div className="flex flex-col gap-3">
         {list.map((o) => (
-          <div key={o.id} className="rounded-2xl p-4" style={{ background: '#fff', border: `1px solid ${COLORS.border}` }}>
+          <div key={o.id} className="rounded-2xl p-4" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
             <div className="flex justify-between items-center mb-3">
               <span style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>{o.id}</span>
               <span style={{ fontFamily: monoFont, fontSize: 12, color: COLORS.primaryDark, fontWeight: 700 }}>{money(o.total)}</span>
@@ -1177,7 +1212,7 @@ function AboutPage({ deliverySettings }) {
       <div>
         <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 13, color: COLORS.ink, marginBottom: 10 }}>Contact Us</p>
         <div className="flex flex-col gap-2.5">
-          <a href={`https://wa.me/${deliverySettings.whatsappNumber}?text=${waMsg}`} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-xl p-3.5" style={{ background: '#fff', border: `1px solid ${COLORS.border}` }}>
+          <a href={`https://wa.me/${deliverySettings.whatsappNumber}?text=${waMsg}`} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-xl p-3.5" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
             <div className="rounded-full flex items-center justify-center" style={{ width: 36, height: 36, background: '#25D3661A' }}>
               <MessageCircle size={17} color="#25D366" />
             </div>
@@ -1187,7 +1222,7 @@ function AboutPage({ deliverySettings }) {
             </div>
             <ChevronRight size={16} color={COLORS.inkSoft} />
           </a>
-          <a href={`tel:+${deliverySettings.whatsappNumber}`} className="flex items-center gap-3 rounded-xl p-3.5" style={{ background: '#fff', border: `1px solid ${COLORS.border}` }}>
+          <a href={`tel:+${deliverySettings.whatsappNumber}`} className="flex items-center gap-3 rounded-xl p-3.5" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
             <div className="rounded-full flex items-center justify-center" style={{ width: 36, height: 36, background: `${COLORS.primary}1A` }}>
               <Smartphone size={17} color={COLORS.primary} />
             </div>
@@ -1214,7 +1249,7 @@ function AdminLogin({ onLogin, adminPassword }) {
       </div>
       <h2 style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 19, color: COLORS.ink }}>Admin Dashboard</h2>
       <p style={{ fontFamily: bodyFont, fontSize: 12, color: COLORS.inkSoft, marginTop: 4, marginBottom: 20, textAlign: 'center' }}>Manage products, orders, delivery zones and more.</p>
-      <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder="Enter admin password" className="w-full px-4 py-3 rounded-xl mb-3" style={{ border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none' }} />
+      <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder="Enter admin password" className="w-full px-4 py-3 rounded-xl mb-3" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none' }} />
       {err && <p style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.danger, marginBottom: 8 }}>{err}</p>}
       <button
         onClick={() => (pw === adminPassword ? onLogin() : setErr('Incorrect password. Please try again.'))}
@@ -1263,13 +1298,13 @@ function AdminOverview({ products, orders }) {
     <div className="p-4">
       <div className="grid grid-cols-2 gap-3 mb-5">
         {kpis.map((k) => (
-          <div key={k.label} className="rounded-2xl p-4" style={{ background: '#fff', border: `1px solid ${COLORS.border}` }}>
+          <div key={k.label} className="rounded-2xl p-4" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
             <p style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft, marginBottom: 6 }}>{k.label}</p>
             <p style={{ fontFamily: monoFont, fontSize: 19, fontWeight: 700, color: k.color }}>{k.value}</p>
           </div>
         ))}
       </div>
-      <div className="rounded-2xl p-4" style={{ background: '#fff', border: `1px solid ${COLORS.border}` }}>
+      <div className="rounded-2xl p-4" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
         <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink, marginBottom: 12 }}>Orders by Status</p>
         <div className="flex items-end gap-3" style={{ height: 120 }}>
           {byStatus.map((b) => (
@@ -1357,7 +1392,7 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
       </button>
 
       {showCats && (
-        <div className="rounded-2xl p-4 mb-4 flex flex-col gap-3" style={{ background: '#fff', border: `1px solid ${COLORS.border}` }}>
+        <div className="rounded-2xl p-4 mb-4 flex flex-col gap-3" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
           <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft }}>The 13 built-in categories are always available. Add your own below &mdash; they'll show up here, on the homepage, and in Shop by Category.</p>
           {customCategories.length > 0 && (
             <div className="flex flex-col gap-2">
@@ -1373,9 +1408,9 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
             </div>
           )}
           <div className="flex gap-2">
-            <input value={catForm.name} onChange={(e) => setCatForm({ ...catForm, name: e.target.value })} placeholder="Category name" className="flex-1 px-3 py-2.5 rounded-lg" style={{ border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }} />
-            <input value={catForm.emoji} onChange={(e) => setCatForm({ ...catForm, emoji: e.target.value })} placeholder="Icon" className="w-16 px-2 py-2.5 rounded-lg text-center" style={{ border: `1px solid ${COLORS.border}`, fontSize: 15, outline: 'none' }} />
-            <input type="color" value={catForm.color} onChange={(e) => setCatForm({ ...catForm, color: e.target.value })} className="w-11 rounded-lg" style={{ border: `1px solid ${COLORS.border}`, padding: 2 }} />
+            <input value={catForm.name} onChange={(e) => setCatForm({ ...catForm, name: e.target.value })} placeholder="Category name" className="flex-1 px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }} />
+            <input value={catForm.emoji} onChange={(e) => setCatForm({ ...catForm, emoji: e.target.value })} placeholder="Icon" className="w-16 px-2 py-2.5 rounded-lg text-center" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontSize: 15, outline: 'none' }} />
+            <input type="color" value={catForm.color} onChange={(e) => setCatForm({ ...catForm, color: e.target.value })} className="w-11 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, padding: 2 }} />
           </div>
           <button onClick={addCategory} className="py-2.5 rounded-lg" style={{ background: COLORS.ink, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>Add Category</button>
         </div>
@@ -1386,20 +1421,20 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
       </button>
 
       {showAdd && (
-        <div className="rounded-2xl p-4 mb-4 flex flex-col gap-2.5" style={{ background: '#fff', border: `1px solid ${COLORS.border}` }}>
-          <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Product name" className="px-3 py-2.5 rounded-lg" style={{ border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }} />
-          <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="px-3 py-2.5 rounded-lg" style={{ border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5 }}>
+        <div className="rounded-2xl p-4 mb-4 flex flex-col gap-2.5" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+          <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Product name" className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }} />
+          <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5 }}>
             {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           <div className="flex gap-2">
-            <input value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value.replace(/\D/g, '') })} placeholder="Selling price" className="flex-1 px-3 py-2.5 rounded-lg" style={{ border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 12.5, outline: 'none' }} />
-            <input value={form.mrp} onChange={(e) => setForm({ ...form, mrp: e.target.value.replace(/\D/g, '') })} placeholder="MRP" className="flex-1 px-3 py-2.5 rounded-lg" style={{ border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 12.5, outline: 'none' }} />
+            <input value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value.replace(/\D/g, '') })} placeholder="Selling price" className="flex-1 px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 12.5, outline: 'none' }} />
+            <input value={form.mrp} onChange={(e) => setForm({ ...form, mrp: e.target.value.replace(/\D/g, '') })} placeholder="MRP" className="flex-1 px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 12.5, outline: 'none' }} />
           </div>
           <div className="flex gap-2">
-            <input value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value.replace(/\D/g, '') })} placeholder="Stock quantity" className="flex-1 px-3 py-2.5 rounded-lg" style={{ border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 12.5, outline: 'none' }} />
-            <input value={form.emoji} onChange={(e) => setForm({ ...form, emoji: e.target.value })} placeholder="Icon (emoji)" className="w-24 px-3 py-2.5 rounded-lg text-center" style={{ border: `1px solid ${COLORS.border}`, fontSize: 15, outline: 'none' }} />
+            <input value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value.replace(/\D/g, '') })} placeholder="Stock quantity" className="flex-1 px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 12.5, outline: 'none' }} />
+            <input value={form.emoji} onChange={(e) => setForm({ ...form, emoji: e.target.value })} placeholder="Icon (emoji)" className="w-24 px-3 py-2.5 rounded-lg text-center" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontSize: 15, outline: 'none' }} />
           </div>
-          <textarea value={form.desc} onChange={(e) => setForm({ ...form, desc: e.target.value })} placeholder="Description" rows={2} className="px-3 py-2.5 rounded-lg" style={{ border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none', resize: 'none' }} />
+          <textarea value={form.desc} onChange={(e) => setForm({ ...form, desc: e.target.value })} placeholder="Description" rows={2} className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none', resize: 'none' }} />
           <div className="flex items-center gap-3">
             <div className="rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0" style={{ width: 56, height: 56, background: COLORS.cream, border: `1px solid ${COLORS.border}` }}>
               {form.imageUrl ? <img src={form.imageUrl} alt="preview" className="w-full h-full" style={{ objectFit: 'cover' }} /> : <span style={{ fontSize: 20 }}>{form.emoji}</span>}
@@ -1418,7 +1453,7 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
         {products.map((p) => {
           const off = pctOff(Number(p.price), Number(p.mrp));
           return (
-            <div key={p.id} className="rounded-2xl p-3 flex gap-3" style={{ background: '#fff', border: `1px solid ${COLORS.border}` }}>
+            <div key={p.id} className="rounded-2xl p-3 flex gap-3" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
               <div className="flex flex-col items-center gap-1 flex-shrink-0">
                 <div className="rounded-xl overflow-hidden flex items-center justify-center" style={{ width: 50, height: 50, background: p.imageUrl ? '#fff' : `linear-gradient(135deg, ${p.g1}, ${p.g2})`, border: `1px solid ${COLORS.border}` }}>
                   {p.imageUrl ? <img src={p.imageUrl} alt={p.name} className="w-full h-full" style={{ objectFit: 'cover' }} /> : <span style={{ fontSize: 22 }}>{p.emoji}</span>}
@@ -1432,14 +1467,16 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
                 <p style={{ ...clamp1, fontFamily: bodyFont, fontWeight: 700, fontSize: 12, color: COLORS.ink }}>{p.name}</p>
                 <div className="flex gap-2 mt-2 flex-wrap">
                   <label className="flex items-center gap-1"><span style={{ fontSize: 10, color: COLORS.inkSoft, fontFamily: bodyFont }}>Price</span>
-                    <input type="text" value={p.price} onChange={(e) => update(p.id, { price: Number(e.target.value.replace(/\D/g, '')) || 0 })} className="w-16 px-1.5 py-1 rounded" style={{ border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 11 }} />
+                    <input type="text" value={p.price} onChange={(e) => update(p.id, { price: Number(e.target.value.replace(/\D/g, '')) || 0 })} className="w-16 px-1.5 py-1 rounded" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 11 }} />
                   </label>
                   <label className="flex items-center gap-1"><span style={{ fontSize: 10, color: COLORS.inkSoft, fontFamily: bodyFont }}>MRP</span>
-                    <input type="text" value={p.mrp} onChange={(e) => update(p.id, { mrp: Number(e.target.value.replace(/\D/g, '')) || 0 })} className="w-16 px-1.5 py-1 rounded" style={{ border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 11 }} />
+                    <input type="text" value={p.mrp} onChange={(e) => update(p.id, { mrp: Number(e.target.value.replace(/\D/g, '')) || 0 })} className="w-16 px-1.5 py-1 rounded" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 11 }} />
                   </label>
                   <label className="flex items-center gap-1"><span style={{ fontSize: 10, color: COLORS.inkSoft, fontFamily: bodyFont }}>Stock</span>
-                    <input type="text" value={p.stock} onChange={(e) => update(p.id, { stock: Number(e.target.value.replace(/\D/g, '')) || 0 })} className="w-14 px-1.5 py-1 rounded" style={{ border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 11 }} />
+                    <input type="text" value={p.stock} onChange={(e) => update(p.id, { stock: Number(e.target.value.replace(/\D/g, '')) || 0 })} className="w-14 px-1.5 py-1 rounded" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${p.stock === 0 ? COLORS.danger : p.stock <= LOW_STOCK_THRESHOLD ? '#B8860B' : COLORS.border}`, fontFamily: monoFont, fontSize: 11 }} />
                   </label>
+                  {p.stock === 0 && <Badge bg={COLORS.danger}>OUT OF STOCK</Badge>}
+                  {p.stock > 0 && p.stock <= LOW_STOCK_THRESHOLD && <Badge bg={COLORS.gold} color={COLORS.ink}>LOW STOCK</Badge>}
                 </div>
                 <div className="flex items-center gap-3 mt-2 flex-wrap">
                   <label className="flex items-center gap-1"><input type="checkbox" checked={p.bestSeller} onChange={(e) => update(p.id, { bestSeller: e.target.checked })} /><span style={{ fontSize: 10, fontFamily: bodyFont, color: COLORS.inkSoft }}>Bestseller</span></label>
@@ -1468,7 +1505,7 @@ function AdminOrders({ orders, setOrders, whatsappNumber }) {
       {!sorted.length && <p style={{ fontFamily: bodyFont, color: COLORS.inkSoft, fontSize: 12.5, textAlign: 'center', marginTop: 40 }}>No orders yet.</p>}
       <div className="flex flex-col gap-3">
         {sorted.map((o) => (
-          <div key={o.id} className="rounded-2xl p-4" style={{ background: '#fff', border: `1px solid ${COLORS.border}` }}>
+          <div key={o.id} className="rounded-2xl p-4" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
             <div className="flex justify-between items-start mb-2">
               <div>
                 <span style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>{o.id}</span>
@@ -1482,7 +1519,7 @@ function AdminOrders({ orders, setOrders, whatsappNumber }) {
               <span style={{ fontFamily: monoFont, fontSize: 13, fontWeight: 700, color: COLORS.ink }}>{money(o.total)}</span>
               <Badge bg={o.payment === 'cod' ? COLORS.gold : o.payment === 'upi' ? COLORS.purple : COLORS.secondary}>{o.payment === 'cod' ? 'COD' : o.payment === 'upi' ? 'UPI' : 'ONLINE'}</Badge>
             </div>
-            <select value={o.status} onChange={(e) => update(o.id, e.target.value)} className="w-full px-3 py-2 rounded-lg" style={{ border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12, fontWeight: 700, color: o.status === 'Cancelled' ? COLORS.danger : COLORS.ink }}>
+            <select value={o.status} onChange={(e) => update(o.id, e.target.value)} className="w-full px-3 py-2 rounded-lg" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12, fontWeight: 700, color: o.status === 'Cancelled' ? COLORS.danger : COLORS.ink }}>
               {STATUS_STEPS.map((s) => <option key={s} value={s}>{s}</option>)}
               <option value="Cancelled">Cancelled</option>
             </select>
@@ -1526,13 +1563,13 @@ function AdminDelivery({ settings, setSettings, categories }) {
   const field = (label, value, onChange, mono) => (
     <label className="flex flex-col gap-1">
       <span style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft, fontWeight: 700 }}>{label}</span>
-      <input value={value} onChange={onChange} className="px-3 py-2.5 rounded-lg" style={{ border: `1px solid ${COLORS.border}`, fontFamily: mono ? monoFont : bodyFont, fontSize: 12.5, outline: 'none' }} />
+      <input value={value} onChange={onChange} className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: mono ? monoFont : bodyFont, fontSize: 12.5, outline: 'none' }} />
     </label>
   );
 
   return (
     <div className="p-4 flex flex-col gap-4 pb-10">
-      <div className="rounded-2xl p-4 flex flex-col gap-3" style={{ background: '#fff', border: `1px solid ${COLORS.border}` }}>
+      <div className="rounded-2xl p-4 flex flex-col gap-3" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
         <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>Shop Details</p>
         {field('Shop name', local.shopName, (e) => setLocal({ ...local, shopName: e.target.value }))}
         {field('Shop area', local.shopArea, (e) => setLocal({ ...local, shopArea: e.target.value }))}
@@ -1541,7 +1578,7 @@ function AdminDelivery({ settings, setSettings, categories }) {
         {field('UPI ID (for UPI payment option, e.g. name@okaxis)', local.upiId, (e) => setLocal({ ...local, upiId: e.target.value.trim() }), true)}
       </div>
 
-      <div className="rounded-2xl p-4 flex flex-col gap-3" style={{ background: '#fff', border: `1px solid ${COLORS.border}` }}>
+      <div className="rounded-2xl p-4 flex flex-col gap-3" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
         <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>Delivery Zone</p>
         <div className="flex gap-2">
           <button onClick={() => setLocal({ ...local, mode: 'pincode' })} className="flex-1 py-2 rounded-lg" style={{ background: local.mode === 'pincode' ? COLORS.ink : COLORS.cream, color: local.mode === 'pincode' ? '#fff' : COLORS.ink, fontFamily: bodyFont, fontSize: 11.5, fontWeight: 700 }}>Selected Pincodes</button>
@@ -1557,8 +1594,8 @@ function AdminDelivery({ settings, setSettings, categories }) {
               </div>
             ))}
             <div className="flex gap-2 mt-1">
-              <input value={newPin.pincode} onChange={(e) => setNewPin({ ...newPin, pincode: e.target.value.replace(/\D/g, '').slice(0, 6) })} placeholder="Pincode" className="w-24 px-2 py-2 rounded-lg" style={{ border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 12 }} />
-              <input value={newPin.area} onChange={(e) => setNewPin({ ...newPin, area: e.target.value })} placeholder="Area name" className="flex-1 px-2 py-2 rounded-lg" style={{ border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12 }} />
+              <input value={newPin.pincode} onChange={(e) => setNewPin({ ...newPin, pincode: e.target.value.replace(/\D/g, '').slice(0, 6) })} placeholder="Pincode" className="w-24 px-2 py-2 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 12 }} />
+              <input value={newPin.area} onChange={(e) => setNewPin({ ...newPin, area: e.target.value })} placeholder="Area name" className="flex-1 px-2 py-2 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12 }} />
               <button onClick={addPin} className="px-3 rounded-lg" style={{ background: COLORS.primary, color: '#fff' }}><Plus size={14} /></button>
             </div>
           </div>
@@ -1570,26 +1607,26 @@ function AdminDelivery({ settings, setSettings, categories }) {
         )}
       </div>
 
-      <div className="rounded-2xl p-4 flex flex-col gap-3" style={{ background: '#fff', border: `1px solid ${COLORS.border}` }}>
+      <div className="rounded-2xl p-4 flex flex-col gap-3" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
         <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>Store Timings</p>
         <div className="flex gap-3">
           <label className="flex-1 flex flex-col gap-1">
             <span style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft, fontWeight: 700 }}>Opens at</span>
-            <input type="time" value={local.openTime} onChange={(e) => setLocal({ ...local, openTime: e.target.value })} className="px-3 py-2.5 rounded-lg" style={{ border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 12.5, outline: 'none' }} />
+            <input type="time" value={local.openTime} onChange={(e) => setLocal({ ...local, openTime: e.target.value })} className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 12.5, outline: 'none' }} />
           </label>
           <label className="flex-1 flex flex-col gap-1">
             <span style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft, fontWeight: 700 }}>Closes at</span>
-            <input type="time" value={local.closeTime} onChange={(e) => setLocal({ ...local, closeTime: e.target.value })} className="px-3 py-2.5 rounded-lg" style={{ border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 12.5, outline: 'none' }} />
+            <input type="time" value={local.closeTime} onChange={(e) => setLocal({ ...local, closeTime: e.target.value })} className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 12.5, outline: 'none' }} />
           </label>
         </div>
         <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft }}>Outside these hours the store shows as &ldquo;Closed&rdquo; to customers and new orders can&rsquo;t be placed.</p>
       </div>
 
-      <div className="rounded-2xl p-4 flex flex-col gap-3" style={{ background: '#fff', border: `1px solid ${COLORS.border}` }}>
+      <div className="rounded-2xl p-4 flex flex-col gap-3" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
         <div className="flex items-center justify-between">
           <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>Festive Banner</p>
           <button onClick={() => setLocal({ ...local, bannerEnabled: !local.bannerEnabled })} className="rounded-full" style={{ width: 42, height: 24, background: local.bannerEnabled ? COLORS.secondary : COLORS.border, position: 'relative', transition: 'background 0.15s' }}>
-            <div className="rounded-full" style={{ width: 18, height: 18, background: '#fff', position: 'absolute', top: 3, left: local.bannerEnabled ? 21 : 3, transition: 'left 0.15s' }} />
+            <div className="rounded-full" style={{ width: 18, height: 18, background: COLORS.card, position: 'absolute', top: 3, left: local.bannerEnabled ? 21 : 3, transition: 'left 0.15s' }} />
           </button>
         </div>
         <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft, marginTop: -6 }}>Show a promotional banner at the top of the home page &mdash; turn it on for festivals or sales, off the rest of the time.</p>
@@ -1604,7 +1641,7 @@ function AdminDelivery({ settings, setSettings, categories }) {
             </div>
             <label className="flex flex-col gap-1">
               <span style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft, fontWeight: 700 }}>Button links to</span>
-              <select value={local.bannerCategory} onChange={(e) => setLocal({ ...local, bannerCategory: e.target.value })} className="px-3 py-2.5 rounded-lg" style={{ border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }}>
+              <select value={local.bannerCategory} onChange={(e) => setLocal({ ...local, bannerCategory: e.target.value })} className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }}>
                 {(categories || []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </label>
@@ -1626,14 +1663,14 @@ function AdminDelivery({ settings, setSettings, categories }) {
               <p style={{ fontFamily: bodyFont, fontSize: 10, color: '#FBE3B0', fontWeight: 700, letterSpacing: 0.5 }}>PREVIEW</p>
               <h2 style={{ fontFamily: displayFont, fontWeight: 700, fontStyle: 'italic', fontSize: 20, color: '#fff', marginTop: 4, lineHeight: 1.15 }}>{local.bannerTitle || 'Your Banner Title'}</h2>
               <p style={{ fontFamily: bodyFont, fontSize: 12, color: '#fff', opacity: 0.9, marginTop: 2 }}>{local.bannerSubtitle || 'Your banner subtitle goes here'}</p>
-              <button className="mt-3 px-4 py-2 rounded-full" style={{ background: '#fff', color: COLORS.primaryDark, fontFamily: bodyFont, fontWeight: 700, fontSize: 12 }}>{local.bannerCta || 'Shop Now'}</button>
+              <button className="mt-3 px-4 py-2 rounded-full" style={{ background: COLORS.card, color: COLORS.primaryDark, fontFamily: bodyFont, fontWeight: 700, fontSize: 12 }}>{local.bannerCta || 'Shop Now'}</button>
               <span className="absolute" style={{ right: -6, bottom: -14, fontSize: 64, opacity: 0.3 }}>{local.bannerEmoji || '\ud83c\udf89'}</span>
             </div>
           </div>
         )}
       </div>
 
-      <div className="rounded-2xl p-4 grid grid-cols-1 gap-3" style={{ background: '#fff', border: `1px solid ${COLORS.border}` }}>
+      <div className="rounded-2xl p-4 grid grid-cols-1 gap-3" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
         <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>Charges &amp; Order Rules</p>
         {field('Minimum order value (\u20b9)', local.minOrderValue, (e) => setLocal({ ...local, minOrderValue: Number(e.target.value.replace(/\D/g, '')) || 0 }), true)}
         {field('Delivery charge (\u20b9)', local.deliveryCharge, (e) => setLocal({ ...local, deliveryCharge: Number(e.target.value.replace(/\D/g, '')) || 0 }), true)}
@@ -1662,14 +1699,14 @@ function AdminSecurity({ adminPassword, setAdminPassword }) {
 
   return (
     <div className="p-4">
-      <div className="rounded-2xl p-4 flex flex-col gap-3" style={{ background: '#fff', border: `1px solid ${COLORS.border}` }}>
+      <div className="rounded-2xl p-4 flex flex-col gap-3" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
         <div className="flex items-center gap-2">
           <KeyRound size={16} color={COLORS.primary} />
           <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>Change Admin Password</p>
         </div>
-        <input type="password" value={currentPw} onChange={(e) => setCurrentPw(e.target.value)} placeholder="Current password" className="px-3 py-2.5 rounded-lg" style={{ border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }} />
-        <input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder="New password" className="px-3 py-2.5 rounded-lg" style={{ border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }} />
-        <input type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} placeholder="Confirm new password" className="px-3 py-2.5 rounded-lg" style={{ border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }} />
+        <input type="password" value={currentPw} onChange={(e) => setCurrentPw(e.target.value)} placeholder="Current password" className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }} />
+        <input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder="New password" className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }} />
+        <input type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} placeholder="Confirm new password" className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }} />
         {msg && <p style={{ fontFamily: bodyFont, fontSize: 11.5, color: msg.type === 'error' ? COLORS.danger : COLORS.secondary }}>{msg.text}</p>}
         <button onClick={submit} className="py-2.5 rounded-lg" style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>Update Password</button>
         <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft }}>{BACKEND_ENABLED ? 'This password is shared across all browsers and devices.' : 'This password is stored only in this browser, not shared across devices, since Supabase isn\u2019t connected yet.'}</p>
@@ -1693,7 +1730,7 @@ function AdminCustomers({ orders }) {
       {!customers.length && <p style={{ fontFamily: bodyFont, color: COLORS.inkSoft, fontSize: 12.5, textAlign: 'center', marginTop: 40 }}>No customers yet.</p>}
       <div className="flex flex-col gap-3">
         {customers.map((c) => (
-          <div key={c.mobile} className="rounded-2xl p-4 flex items-center gap-3" style={{ background: '#fff', border: `1px solid ${COLORS.border}` }}>
+          <div key={c.mobile} className="rounded-2xl p-4 flex items-center gap-3" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
             <div className="rounded-full flex items-center justify-center flex-shrink-0" style={{ width: 40, height: 40, background: COLORS.cream, fontFamily: displayFont, fontWeight: 700, color: COLORS.primary }}>{c.name.charAt(0).toUpperCase()}</div>
             <div className="flex-1 min-w-0">
               <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>{c.name}</p>
@@ -1732,6 +1769,8 @@ function AdminPage({ products, setProducts, orders, setOrders, deliverySettings,
 /* ------------------------------------ APP ------------------------------------ */
 export default function App() {
   const [loaded, setLoaded] = useState(false);
+  const [theme, setTheme] = useState('light');
+  applyTheme(theme); // mutate the shared COLORS object before this render's JSX reads it
   const [products, setProducts] = useState(SEED_PRODUCTS);
   const [orders, setOrders] = useState([]);
   const [deliverySettings, setDeliverySettings] = useState(SEED_DELIVERY);
@@ -1764,12 +1803,14 @@ export default function App() {
           window.storage.get('mm-location'),
           window.storage.get('mm-admin-pw'),
           window.storage.get('mm-custom-categories'),
+          window.storage.get('mm-theme'),
         ]);
-        const [c, loc, pw, cc] = results.map((r) => (r.status === 'fulfilled' ? r.value : null));
+        const [c, loc, pw, cc, th] = results.map((r) => (r.status === 'fulfilled' ? r.value : null));
         if (c && c.value) setCart(JSON.parse(c.value));
         if (loc && loc.value) { setDeliveryArea(loc.value); setShowLocationModal(false); }
         if (pw && pw.value) setAdminPassword(pw.value);
         if (cc && cc.value) setCustomCategories(JSON.parse(cc.value));
+        if (th && th.value) setTheme(th.value);
       } catch (e) { /* keep defaults */ }
 
       if (BACKEND_ENABLED) {
@@ -1837,6 +1878,7 @@ export default function App() {
     else window.storage.set('mm-admin-pw', adminPassword).catch(() => {});
   }, [adminPassword, loaded]);
   useEffect(() => { if (loaded) window.storage.set('mm-custom-categories', JSON.stringify(customCategories)).catch(() => {}); }, [customCategories, loaded]);
+  useEffect(() => { if (loaded) window.storage.set('mm-theme', theme).catch(() => {}); }, [theme, loaded]);
 
   const nav = (page, params = {}) => { setRoute({ page, params }); window.scrollTo(0, 0); };
 
@@ -1958,7 +2000,7 @@ export default function App() {
           showBackHeader ? (
             <Header title={headerTitleMap[route.page] || ''} onBack={() => nav(route.page === 'product' ? 'home' : 'home')} />
           ) : (
-            <Header query={query} setQuery={setQuery} onSearch={runSearch} area={deliveryArea} onChangeLocation={() => setShowLocationModal(true)} shopName={deliverySettings.shopName} products={products} nav={nav} categories={allRealCategories} deliverySettings={deliverySettings} />
+            <Header query={query} setQuery={setQuery} onSearch={runSearch} area={deliveryArea} onChangeLocation={() => setShowLocationModal(true)} shopName={deliverySettings.shopName} products={products} nav={nav} categories={allRealCategories} deliverySettings={deliverySettings} theme={theme} setTheme={setTheme} />
           )
         )}
 
