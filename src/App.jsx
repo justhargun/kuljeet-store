@@ -207,6 +207,9 @@ function mapProductFromDb(r) {
     bestSeller: !!r.best_seller, isNew: !!r.is_new, deal: !!r.deal, desc: r.description || '', imageUrl: r.image_url || '',
   };
 }
+function mapReviewFromDb(r) {
+  return { id: r.id, productId: r.product_id, name: r.customer_name, rating: Number(r.rating), comment: r.comment || '', createdAt: r.created_at ? new Date(r.created_at).getTime() : Date.now() };
+}
 function readImageAsDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -456,7 +459,7 @@ function Badge({ children, bg, color = '#fff' }) {
   );
 }
 
-function ProductCard({ product, onOpen, onAdd, qty }) {
+function ProductCard({ product, onOpen, onAdd, qty, isWishlisted, onToggleWishlist }) {
   const off = pctOff(product.price, product.mrp);
   return (
     <div
@@ -473,11 +476,16 @@ function ProductCard({ product, onOpen, onAdd, qty }) {
         <div className="absolute top-2 left-2 flex flex-col gap-1 items-start">
           {product.isNew && <Badge bg={COLORS.secondary}>NEW</Badge>}
           {product.stock > 0 && product.stock <= LOW_STOCK_THRESHOLD && <Badge bg={COLORS.gold} color={COLORS.ink}>ONLY {product.stock} LEFT</Badge>}
+          {off > 0 && <Badge bg={COLORS.danger}>{off}% OFF</Badge>}
         </div>
-        {off > 0 && (
-          <div className="absolute top-2 right-2">
-            <Badge bg={COLORS.danger}>{off}% OFF</Badge>
-          </div>
+        {onToggleWishlist && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onToggleWishlist(product.id); }}
+            className="absolute top-2 right-2 flex items-center justify-center rounded-full"
+            style={{ width: 26, height: 26, background: 'rgba(255,255,255,0.85)' }}
+          >
+            <Heart size={14} fill={isWishlisted ? COLORS.danger : 'none'} color={isWishlisted ? COLORS.danger : COLORS.inkSoft} />
+          </button>
         )}
         {product.stock === 0 && (
           <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(43,32,19,0.55)' }}>
@@ -524,12 +532,12 @@ function SectionHeader({ title, subtitle, onSeeAll }) {
   );
 }
 
-function Rail({ products, onOpen, onAdd, cart }) {
+function Rail({ products, onOpen, onAdd, cart, wishlist, onToggleWishlist }) {
   if (!products.length) return <p className="px-4 text-sm" style={{ color: COLORS.inkSoft, fontFamily: bodyFont }}>Nothing here yet.</p>;
   return (
     <div className="flex gap-3 overflow-x-auto px-4 pb-1" style={{ scrollbarWidth: 'none' }}>
       {products.map((p) => (
-        <ProductCard key={p.id} product={p} onOpen={onOpen} onAdd={onAdd} qty={cart[p.id] || 0} />
+        <ProductCard key={p.id} product={p} onOpen={onOpen} onAdd={onAdd} qty={cart[p.id] || 0} isWishlisted={!!(wishlist && wishlist[p.id])} onToggleWishlist={onToggleWishlist} />
       ))}
     </div>
   );
@@ -679,6 +687,7 @@ function BottomNav({ page, nav, cartCount }) {
   const items = [
     { id: 'home', label: 'Home', Icon: Home },
     { id: 'categories', label: 'Categories', Icon: LayoutGrid },
+    { id: 'wishlist', label: 'Wishlist', Icon: Heart },
     { id: 'cart', label: 'Cart', Icon: ShoppingCart, badge: cartCount },
     { id: 'admin', label: 'Admin', Icon: Lock },
   ];
@@ -753,7 +762,7 @@ function LocationModal({ onClose, onConfirm, deliverySettings }) {
 }
 
 /* ----------------------------------- PAGES ----------------------------------- */
-function HomePage({ products, nav, onAdd, cart, area, categories, deliverySettings }) {
+function HomePage({ products, nav, onAdd, cart, area, categories, deliverySettings, wishlist, onToggleWishlist }) {
   const bestSellers = products.filter((p) => p.bestSeller);
   const newArrivals = products.filter((p) => p.isNew);
   const deals = products.filter((p) => p.deal);
@@ -788,21 +797,21 @@ function HomePage({ products, nav, onAdd, cart, area, categories, deliverySettin
       </div>
 
       <SectionHeader title="Best Sellers" subtitle="Loved by your neighbours" onSeeAll={() => nav('list', { title: 'Best Sellers', filter: 'bestSeller' })} />
-      <Rail products={bestSellers} onOpen={(p) => nav('product', { id: p.id })} onAdd={onAdd} cart={cart} />
+      <Rail products={bestSellers} onOpen={(p) => nav('product', { id: p.id })} onAdd={onAdd} cart={cart} wishlist={wishlist} onToggleWishlist={onToggleWishlist} />
 
       <div className="mt-6" />
       <SectionHeader title="New Arrivals" subtitle="Fresh on our shelves" onSeeAll={() => nav('category', { id: 'newarrivals' })} />
-      <Rail products={newArrivals} onOpen={(p) => nav('product', { id: p.id })} onAdd={onAdd} cart={cart} />
+      <Rail products={newArrivals} onOpen={(p) => nav('product', { id: p.id })} onAdd={onAdd} cart={cart} wishlist={wishlist} onToggleWishlist={onToggleWishlist} />
 
       <div className="mt-6" />
       <SectionHeader title="Today's Deals" subtitle="Grab them before they're gone" onSeeAll={() => nav('category', { id: 'offers' })} />
-      <Rail products={deals} onOpen={(p) => nav('product', { id: p.id })} onAdd={onAdd} cart={cart} />
+      <Rail products={deals} onOpen={(p) => nav('product', { id: p.id })} onAdd={onAdd} cart={cart} wishlist={wishlist} onToggleWishlist={onToggleWishlist} />
 
       <div className="mt-6" />
       <SectionHeader title="Recommended for You" />
       <div className="grid grid-cols-2 gap-3 px-4">
         {recommended.map((p) => (
-          <ProductCard key={p.id} product={p} onOpen={(pr) => nav('product', { id: pr.id })} onAdd={onAdd} qty={cart[p.id] || 0} />
+          <ProductCard key={p.id} product={p} onOpen={(pr) => nav('product', { id: pr.id })} onAdd={onAdd} qty={cart[p.id] || 0} isWishlisted={!!(wishlist && wishlist[p.id])} onToggleWishlist={onToggleWishlist} />
         ))}
       </div>
 
@@ -828,7 +837,7 @@ function CategoriesPage({ nav, categories }) {
   );
 }
 
-function ProductListPage({ products, title, nav, onAdd, cart }) {
+function ProductListPage({ products, title, nav, onAdd, cart, wishlist, onToggleWishlist }) {
   return (
     <div className="p-4">
       {!products.length ? (
@@ -839,7 +848,7 @@ function ProductListPage({ products, title, nav, onAdd, cart }) {
       ) : (
         <div className="grid grid-cols-2 gap-3">
           {products.map((p) => (
-            <ProductCard key={p.id} product={p} onOpen={(pr) => nav('product', { id: pr.id })} onAdd={onAdd} qty={cart[p.id] || 0} />
+            <ProductCard key={p.id} product={p} onOpen={(pr) => nav('product', { id: pr.id })} onAdd={onAdd} qty={cart[p.id] || 0} isWishlisted={!!(wishlist && wishlist[p.id])} onToggleWishlist={onToggleWishlist} />
           ))}
         </div>
       )}
@@ -847,17 +856,74 @@ function ProductListPage({ products, title, nav, onAdd, cart }) {
   );
 }
 
-function ProductPage({ product, nav, onAdd, onBuyNow, qty }) {
+function WishlistPage({ products, wishlist, nav, onAdd, cart, onToggleWishlist }) {
+  const saved = products.filter((p) => wishlist && wishlist[p.id]);
+  return (
+    <div className="p-4">
+      <h2 style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 18, color: COLORS.ink, marginBottom: 14 }}>My Wishlist</h2>
+      {!saved.length ? (
+        <div className="flex flex-col items-center py-16 gap-2">
+          <Heart size={36} color={COLORS.inkSoft} />
+          <p style={{ fontFamily: bodyFont, color: COLORS.inkSoft, fontSize: 13 }}>Nothing saved yet.</p>
+          <button onClick={() => nav('home')} className="mt-2 px-4 py-2 rounded-full" style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>Browse Products</button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3">
+          {saved.map((p) => (
+            <ProductCard key={p.id} product={p} onOpen={(pr) => nav('product', { id: pr.id })} onAdd={onAdd} qty={cart[p.id] || 0} isWishlisted={true} onToggleWishlist={onToggleWishlist} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProductPage({ product, nav, onAdd, onBuyNow, qty, reviews = [], onAddReview, isWishlisted, onToggleWishlist }) {
   const [n, setN] = useState(1);
+  const [showForm, setShowForm] = useState(false);
+  const [rName, setRName] = useState('');
+  const [rRating, setRRating] = useState(5);
+  const [rComment, setRComment] = useState('');
+  const [rError, setRError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   if (!product) return null;
   const off = pctOff(product.price, product.mrp);
+
+  const productReviews = reviews.filter((r) => r.productId === product.id).sort((a, b) => b.createdAt - a.createdAt);
+  const avgRating = productReviews.length ? (productReviews.reduce((s, r) => s + r.rating, 0) / productReviews.length) : product.rating;
+  const displayRating = Math.round(avgRating * 10) / 10;
+
+  const submitReview = async () => {
+    setRError('');
+    if (!rName.trim()) return setRError('Please enter your name.');
+    if (!rComment.trim()) return setRError('Please write a short review.');
+    setSubmitting(true);
+    try {
+      await onAddReview(product.id, { name: rName.trim(), rating: rRating, comment: rComment.trim() });
+      setRName(''); setRRating(5); setRComment(''); setShowForm(false);
+    } catch (e) {
+      setRError('Could not submit your review. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <div className="pb-32">
-      <div className="flex items-center justify-center" style={{ height: 240, background: product.imageUrl ? '#fff' : `linear-gradient(135deg, ${product.g1}, ${product.g2})` }}>
+      <div className="relative flex items-center justify-center" style={{ height: 240, background: product.imageUrl ? '#fff' : `linear-gradient(135deg, ${product.g1}, ${product.g2})` }}>
         {product.imageUrl ? (
           <img src={product.imageUrl} alt={product.name} className="w-full h-full" style={{ objectFit: 'cover' }} />
         ) : (
           <span style={{ fontSize: 96 }}>{product.emoji}</span>
+        )}
+        {onToggleWishlist && (
+          <button
+            onClick={() => onToggleWishlist(product.id)}
+            className="absolute top-3 right-3 flex items-center justify-center rounded-full"
+            style={{ width: 36, height: 36, background: 'rgba(255,255,255,0.9)' }}
+          >
+            <Heart size={18} fill={isWishlisted ? COLORS.danger : 'none'} color={isWishlisted ? COLORS.danger : COLORS.inkSoft} />
+          </button>
         )}
       </div>
       <div className="p-4">
@@ -869,7 +935,9 @@ function ProductPage({ product, nav, onAdd, onBuyNow, qty }) {
         <h1 style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 21, color: COLORS.ink }}>{product.name}</h1>
         <div className="flex items-center gap-1 mt-1.5">
           <Star size={13} fill={COLORS.gold} color={COLORS.gold} />
-          <span style={{ fontFamily: bodyFont, fontSize: 12.5, color: COLORS.inkSoft }}>{product.rating} rating</span>
+          <span style={{ fontFamily: bodyFont, fontSize: 12.5, color: COLORS.inkSoft }}>
+            {displayRating} rating{productReviews.length > 0 ? ` \u00b7 ${productReviews.length} review${productReviews.length === 1 ? '' : 's'}` : ''}
+          </span>
           <span style={{ color: COLORS.border }}>&bull;</span>
           <span style={{ fontFamily: bodyFont, fontSize: 12.5, color: product.stock === 0 ? COLORS.danger : product.stock <= LOW_STOCK_THRESHOLD ? '#B8860B' : COLORS.secondary, fontWeight: 700 }}>
             {product.stock === 0 ? 'Out of stock' : product.stock <= LOW_STOCK_THRESHOLD ? `Only ${product.stock} left \u2014 order soon` : `${product.stock} in stock`}
@@ -890,6 +958,58 @@ function ProductPage({ product, nav, onAdd, onBuyNow, qty }) {
             <button onClick={() => setN(Math.min(product.stock || 1, n + 1))}><Plus size={14} color={COLORS.ink} /></button>
           </div>
           {qty > 0 && <span style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.secondary, fontWeight: 700 }}>{qty} already in cart</span>}
+        </div>
+
+        <div className="mt-7">
+          <div className="flex items-center justify-between mb-3">
+            <h3 style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 14, color: COLORS.ink }}>Ratings &amp; Reviews</h3>
+            {!showForm && (
+              <button onClick={() => setShowForm(true)} style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12, color: COLORS.primary }}>
+                Write a Review
+              </button>
+            )}
+          </div>
+
+          {showForm && (
+            <div className="rounded-2xl p-3.5 mb-4 flex flex-col gap-2.5" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+              <input value={rName} onChange={(e) => setRName(e.target.value)} placeholder="Your name" className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }} />
+              <div className="flex items-center gap-1">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <button key={i} onClick={() => setRRating(i)}>
+                    <Star size={22} fill={i <= rRating ? COLORS.gold : 'none'} color={COLORS.gold} />
+                  </button>
+                ))}
+              </div>
+              <textarea value={rComment} onChange={(e) => setRComment(e.target.value)} placeholder="Share your experience with this product" rows={3} className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none', resize: 'none' }} />
+              {rError && <p style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.danger }}>{rError}</p>}
+              <div className="flex gap-2">
+                <button onClick={() => { setShowForm(false); setRError(''); }} className="flex-1 py-2.5 rounded-lg" style={{ border: `1px solid ${COLORS.border}`, color: COLORS.inkSoft, fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>Cancel</button>
+                <button onClick={submitReview} disabled={submitting} className="flex-1 py-2.5 rounded-lg" style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, opacity: submitting ? 0.6 : 1 }}>
+                  {submitting ? 'Submitting...' : 'Submit Review'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {productReviews.length === 0 ? (
+            <p style={{ fontFamily: bodyFont, fontSize: 12.5, color: COLORS.inkSoft }}>No reviews yet &mdash; be the first to share your experience.</p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {productReviews.map((r) => (
+                <div key={r.id} className="rounded-xl p-3" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+                  <div className="flex items-center justify-between">
+                    <span style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>{r.name}</span>
+                    <div className="flex items-center gap-0.5">
+                      {[1, 2, 3, 4, 5].map((i) => (
+                        <Star key={i} size={12} fill={i <= r.rating ? COLORS.gold : 'none'} color={COLORS.gold} />
+                      ))}
+                    </div>
+                  </div>
+                  <p style={{ fontFamily: bodyFont, fontSize: 12, color: COLORS.inkSoft, lineHeight: 1.5, marginTop: 4 }}>{r.comment}</p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -1233,6 +1353,20 @@ function AboutPage({ deliverySettings }) {
             <ChevronRight size={16} color={COLORS.inkSoft} />
           </a>
         </div>
+      </div>
+
+      <div>
+        <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 13, color: COLORS.ink, marginBottom: 10 }}>Get the App</p>
+        <a href="/kuljeet-store.apk" download className="flex items-center gap-3 rounded-xl p-3.5" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+          <div className="rounded-full flex items-center justify-center" style={{ width: 36, height: 36, background: `${COLORS.secondary}1A` }}>
+            <Smartphone size={17} color={COLORS.secondary} />
+          </div>
+          <div className="flex-1">
+            <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>Download for Android</p>
+            <p style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft }}>Direct download &mdash; not on Play Store</p>
+          </div>
+          <ChevronRight size={16} color={COLORS.inkSoft} />
+        </a>
       </div>
     </div>
   );
@@ -1784,6 +1918,8 @@ export default function App() {
   const [customCategories, setCustomCategories] = useState([]);
   const [lastOrder, setLastOrder] = useState(null);
   const [lastMobile, setLastMobile] = useState('');
+  const [reviews, setReviews] = useState([]);
+  const [wishlist, setWishlist] = useState({});
 
   useEffect(() => {
     const link = document.createElement('link');
@@ -1804,13 +1940,15 @@ export default function App() {
           window.storage.get('mm-admin-pw'),
           window.storage.get('mm-custom-categories'),
           window.storage.get('mm-theme'),
+          window.storage.get('mm-wishlist'),
         ]);
-        const [c, loc, pw, cc, th] = results.map((r) => (r.status === 'fulfilled' ? r.value : null));
+        const [c, loc, pw, cc, th, wl] = results.map((r) => (r.status === 'fulfilled' ? r.value : null));
         if (c && c.value) setCart(JSON.parse(c.value));
         if (loc && loc.value) { setDeliveryArea(loc.value); setShowLocationModal(false); }
         if (pw && pw.value) setAdminPassword(pw.value);
         if (cc && cc.value) setCustomCategories(JSON.parse(cc.value));
         if (th && th.value) setTheme(th.value);
+        if (wl && wl.value) setWishlist(JSON.parse(wl.value));
       } catch (e) { /* keep defaults */ }
 
       if (BACKEND_ENABLED) {
@@ -1820,6 +1958,12 @@ export default function App() {
             sbSelect('delivery_settings', '?select=*&id=eq.1'),
             sbSelect('delivery_pincodes', '?select=*'),
           ]);
+          try {
+            const reviewRows = await sbSelect('reviews', '?select=*&order=created_at.desc');
+            if (reviewRows) setReviews(reviewRows.map(mapReviewFromDb));
+          } catch (e) {
+            console.error('Could not load reviews (has fix-reviews.sql been run yet?):', e);
+          }
           const alreadySeeded = !!(settingsRows && settingsRows[0] && settingsRows[0].products_seeded);
           if (prodRows && prodRows.length) {
             setProducts(prodRows.map(mapProductFromDb));
@@ -1858,11 +2002,13 @@ export default function App() {
           window.storage.get('mm-products'),
           window.storage.get('mm-orders'),
           window.storage.get('mm-delivery'),
+          window.storage.get('mm-reviews'),
         ]);
-        const [p, o, d] = results.map((r) => (r.status === 'fulfilled' ? r.value : null));
+        const [p, o, d, rv] = results.map((r) => (r.status === 'fulfilled' ? r.value : null));
         if (p && p.value) setProducts(JSON.parse(p.value));
         if (o && o.value) setOrders(JSON.parse(o.value));
         if (d && d.value) setDeliverySettings({ ...SEED_DELIVERY, ...JSON.parse(d.value) });
+        if (rv && rv.value) setReviews(JSON.parse(rv.value));
       } catch (e) { /* fall back to seed data */ }
       setLoaded(true);
     })();
@@ -1872,6 +2018,8 @@ export default function App() {
   useEffect(() => { if (loaded) window.storage.set('mm-orders', JSON.stringify(orders)).catch(() => {}); }, [orders, loaded]);
   useEffect(() => { if (loaded && !BACKEND_ENABLED) window.storage.set('mm-delivery', JSON.stringify(deliverySettings)).catch(() => {}); }, [deliverySettings, loaded]);
   useEffect(() => { if (loaded) window.storage.set('mm-cart', JSON.stringify(cart)).catch(() => {}); }, [cart, loaded]);
+  useEffect(() => { if (loaded) window.storage.set('mm-wishlist', JSON.stringify(wishlist)).catch(() => {}); }, [wishlist, loaded]);
+  useEffect(() => { if (loaded && !BACKEND_ENABLED) window.storage.set('mm-reviews', JSON.stringify(reviews)).catch(() => {}); }, [reviews, loaded]);
   useEffect(() => {
     if (!loaded) return;
     if (BACKEND_ENABLED) sbUpdate('delivery_settings', 'id=eq.1', { admin_password: adminPassword }).catch((e) => console.error('Admin password failed to sync:', e));
@@ -1900,6 +2048,24 @@ export default function App() {
     setCart((c) => ({ ...c, [id]: qty }));
   };
   const removeItem = (id) => { const c = { ...cart }; delete c[id]; setCart(c); };
+
+  const toggleWishlist = (id) => {
+    setWishlist((w) => {
+      const n = { ...w };
+      if (n[id]) delete n[id]; else n[id] = true;
+      return n;
+    });
+  };
+
+  const addReview = async (productId, { name, rating, comment }) => {
+    if (BACKEND_ENABLED) {
+      const rows = await sbInsert('reviews', [{ product_id: productId, customer_name: name, rating, comment }]);
+      setReviews((r) => [mapReviewFromDb(rows[0]), ...r]);
+    } else {
+      const local = { id: `local-${Date.now()}`, productId, name, rating, comment, createdAt: Date.now() };
+      setReviews((r) => [local, ...r]);
+    }
+  };
 
   const cartItems = useMemo(() => Object.entries(cart).map(([id, qty]) => {
     const p = products.find((p) => p.id === id);
@@ -2005,10 +2171,10 @@ export default function App() {
         )}
 
         <div className="flex-1">
-          {route.page === 'home' && <HomePage products={products} nav={nav} onAdd={addToCart} cart={cart} area={deliveryArea} categories={allCategories} deliverySettings={deliverySettings} />}
+          {route.page === 'home' && <HomePage products={products} nav={nav} onAdd={addToCart} cart={cart} area={deliveryArea} categories={allCategories} deliverySettings={deliverySettings} wishlist={wishlist} onToggleWishlist={toggleWishlist} />}
           {route.page === 'categories' && <CategoriesPage nav={nav} categories={allRealCategories} />}
-          {route.page === 'category' && <ProductListPage products={categoryProducts} nav={nav} onAdd={addToCart} cart={cart} />}
-          {route.page === 'list' && <ProductListPage products={listProducts} nav={nav} onAdd={addToCart} cart={cart} />}
+          {route.page === 'category' && <ProductListPage products={categoryProducts} nav={nav} onAdd={addToCart} cart={cart} wishlist={wishlist} onToggleWishlist={toggleWishlist} />}
+          {route.page === 'list' && <ProductListPage products={listProducts} nav={nav} onAdd={addToCart} cart={cart} wishlist={wishlist} onToggleWishlist={toggleWishlist} />}
           {route.page === 'product' && <ProductPage product={currentProduct} nav={nav} onAdd={addToCart} onBuyNow={buyNow} qty={currentProduct ? (cart[currentProduct.id] || 0) : 0} />}
           {route.page === 'cart' && <CartPage cartItems={cartItems} updateQty={updateQty} removeItem={removeItem} subtotal={subtotal} nav={nav} />}
           {route.page === 'checkout' && (
@@ -2019,6 +2185,7 @@ export default function App() {
           {route.page === 'ordersuccess' && <OrderSuccessPage order={lastOrder} nav={nav} whatsappNumber={deliverySettings.whatsappNumber} orders={orders} setOrders={setOrders} />}
           {route.page === 'myorders' && <MyOrdersPage orders={orders} setOrders={setOrders} lastMobile={lastMobile} />}
           {route.page === 'about' && <AboutPage deliverySettings={deliverySettings} />}
+          {route.page === 'wishlist' && <WishlistPage products={products} wishlist={wishlist} nav={nav} onAdd={addToCart} cart={cart} onToggleWishlist={toggleWishlist} />}
           {route.page === 'admin' && !isAdmin && <AdminLogin onLogin={() => setIsAdmin(true)} adminPassword={adminPassword} />}
           {route.page === 'admin' && isAdmin && (
             <AdminPage
