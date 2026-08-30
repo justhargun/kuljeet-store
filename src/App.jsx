@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Search, MapPin, ShoppingCart, Home, LayoutGrid, Package, Star, Plus, Minus,
   Check, ChevronRight, ChevronDown, X, Sparkles, Droplet, Droplets,
@@ -141,9 +141,55 @@ function payWithRazorpay({ amountRupees, shopName, customerName, customerMobile 
   });
 }
 
+// currentAuthToken starts as the public anon key (used for all public/customer
+// actions). When the shop owner logs in via real Supabase Auth, this becomes
+// their personal session token instead, so their writes are treated as
+// "authenticated" by the database's security rules. Logging out resets it.
+let currentAuthToken = SUPABASE_ANON_KEY;
+function setAuthToken(token) { currentAuthToken = token || SUPABASE_ANON_KEY; }
+
+async function sbAuthUpdatePassword(newPassword) {
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+    method: 'PUT',
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${currentAuthToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password: newPassword }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error_description || data.msg || 'Could not update password.');
+  return data;
+}
+async function sbAuthLogin(email, password) {
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error_description || data.msg || 'Login failed. Check your email and password.');
+  return data;
+}
+async function sbAuthRefresh(refreshToken) {
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refresh_token: refreshToken }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error_description || data.msg || 'Session expired.');
+  return data;
+}
+async function sbRpc(fnName, params = {}) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fnName}`, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${currentAuthToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) throw new Error(`Supabase rpc ${fnName} failed (${res.status})`);
+  return res.json();
+}
 async function sbSelect(table, qs = '') {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}${qs}`, {
-    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${currentAuthToken}` },
   });
   if (!res.ok) throw new Error(`Supabase select on ${table} failed (${res.status})`);
   return res.json();
@@ -152,7 +198,7 @@ async function sbInsert(table, rows) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
     method: 'POST',
     headers: {
-      apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${currentAuthToken}`,
       'Content-Type': 'application/json', Prefer: 'return=representation',
     },
     body: JSON.stringify(rows),
@@ -164,7 +210,7 @@ async function sbUpdate(table, filterQs, patch) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${filterQs}`, {
     method: 'PATCH',
     headers: {
-      apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${currentAuthToken}`,
       'Content-Type': 'application/json', Prefer: 'return=representation',
     },
     body: JSON.stringify(patch),
@@ -175,7 +221,7 @@ async function sbUpdate(table, filterQs, patch) {
 async function sbDelete(table, filterQs) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${filterQs}`, {
     method: 'DELETE',
-    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${currentAuthToken}` },
   });
   if (!res.ok) throw new Error(`Supabase delete on ${table} failed (${res.status})`);
 }
@@ -387,9 +433,19 @@ function isShopOpen(settings) {
 const STATUS_STEPS = ['Order Received', 'Confirmed', 'Packing', 'Out for Delivery', 'Delivered'];
 const LOW_STOCK_THRESHOLD = 5;
 const CANCELLABLE_STATUSES = ['Order Received', 'Confirmed'];
+function mapOrderFromDb(row, itemRows = []) {
+  return {
+    id: row.id, name: row.customer_name, mobile: row.mobile, address: row.address, pincode: row.pincode, area: row.area,
+    items: itemRows.filter((i) => i.order_id === row.id).map((i) => ({ id: i.product_id, name: i.name, price: Number(i.price), qty: i.qty })),
+    subtotal: Number(row.subtotal), deliveryCharge: Number(row.delivery_charge), total: Number(row.total),
+    payment: row.payment, paymentId: row.payment_ref || null, status: row.status,
+    createdAt: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
+  };
+}
 function cancelOrderById(id, orders, setOrders) {
+  const order = orders.find((o) => o.id === id);
   setOrders(orders.map((o) => (o.id === id ? { ...o, status: 'Cancelled' } : o)));
-  if (BACKEND_ENABLED) sbUpdate('orders', `id=eq.${id}`, { status: 'Cancelled' }).catch((e) => console.error('Order cancellation failed to sync:', e));
+  if (BACKEND_ENABLED && order) sbRpc('cancel_order', { p_order_id: id, p_mobile: order.mobile }).catch((e) => console.error('Order cancellation failed to sync:', e));
 }
 
 /* -------------------------------- SMALL PARTS -------------------------------- */
@@ -815,7 +871,10 @@ function HomePage({ products, nav, onAdd, cart, area, categories, deliverySettin
         ))}
       </div>
 
-      <button onClick={() => nav('about')} className="w-full mt-7 py-3.5 flex items-center justify-center gap-1.5" style={{ borderTop: `1px solid ${COLORS.border}`, color: COLORS.inkSoft, fontFamily: bodyFont, fontSize: 12, fontWeight: 600 }}>
+      <button onClick={() => nav('myorders')} className="w-full mt-7 py-3.5 flex items-center justify-center gap-1.5" style={{ borderTop: `1px solid ${COLORS.border}`, color: COLORS.inkSoft, fontFamily: bodyFont, fontSize: 12, fontWeight: 600 }}>
+        My Orders <ChevronRight size={14} />
+      </button>
+      <button onClick={() => nav('about')} className="w-full py-3.5 flex items-center justify-center gap-1.5" style={{ borderTop: `1px solid ${COLORS.border}`, color: COLORS.inkSoft, fontFamily: bodyFont, fontSize: 12, fontWeight: 600 }}>
         About Us & Contact <ChevronRight size={14} />
       </button>
     </div>
@@ -1255,48 +1314,44 @@ function OrderSuccessPage({ order, nav, whatsappNumber, orders, setOrders }) {
       <a href={waLink} target="_blank" rel="noopener noreferrer" className="w-full mt-4 py-3.5 rounded-xl flex items-center justify-center gap-2" style={{ background: '#1EA556', color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 13.5 }}>
         <MessageCircle size={17} /> Notify Shop on WhatsApp
       </a>
-      <button onClick={() => nav('myorders')} className="w-full mt-2.5 py-3 rounded-xl" style={{ border: `1px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: bodyFont, fontWeight: 700, fontSize: 13 }}>Track My Orders</button>
+      <button onClick={() => nav('myorders')} className="w-full mt-2.5 py-3 rounded-xl" style={{ border: `1px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: bodyFont, fontWeight: 700, fontSize: 13 }}>My Orders</button>
       <button onClick={() => nav('home')} className="w-full mt-2.5 py-3" style={{ color: COLORS.inkSoft, fontFamily: bodyFont, fontSize: 12.5 }}>Continue Shopping</button>
     </div>
   );
 }
 
-function MyOrdersPage({ orders, setOrders, lastMobile }) {
-  const [mobile, setMobile] = useState(lastMobile || '');
-  const [searched, setSearched] = useState(!!lastMobile);
-  const list = orders.filter((o) => o.mobile === mobile).sort((a, b) => b.createdAt - a.createdAt);
+function MyOrdersPage({ orders, setOrders, nav }) {
   const doCancel = (id) => {
     if (window.confirm('Cancel this order? This cannot be undone.')) cancelOrderById(id, orders, setOrders);
   };
+  const sorted = [...orders].sort((a, b) => b.createdAt - a.createdAt);
   return (
     <div className="p-4 pb-10">
-      <div className="flex gap-2 mb-4">
-        <input value={mobile} onChange={(e) => setMobile(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="Enter your mobile number" className="flex-1 px-4 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 13, outline: 'none' }} />
-        <button onClick={() => setSearched(true)} className="px-4 rounded-xl" style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>Find</button>
-      </div>
-      {searched && !list.length && (
+      {!sorted.length ? (
         <div className="flex flex-col items-center py-16 gap-2">
           <ClipboardList size={34} color={COLORS.inkSoft} />
-          <p style={{ fontFamily: bodyFont, color: COLORS.inkSoft, fontSize: 12.5 }}>No orders found for this number.</p>
+          <p style={{ fontFamily: bodyFont, color: COLORS.inkSoft, fontSize: 12.5, textAlign: 'center' }}>No orders placed from this device yet.</p>
+          <button onClick={() => nav('home')} className="mt-2 px-4 py-2 rounded-full" style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>Start Shopping</button>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {sorted.map((o) => (
+            <div key={o.id} className="rounded-2xl p-4" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+              <div className="flex justify-between items-center mb-3">
+                <span style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>{o.id}</span>
+                <span style={{ fontFamily: monoFont, fontSize: 12, color: COLORS.primaryDark, fontWeight: 700 }}>{money(o.total)}</span>
+              </div>
+              <StatusStepper status={o.status} compact />
+              <p style={{ ...clamp1, fontFamily: bodyFont, fontSize: 11.5, color: COLORS.inkSoft, marginTop: 10 }}>{o.items.map((i) => i.name).join(', ')}</p>
+              {CANCELLABLE_STATUSES.includes(o.status) && (
+                <button onClick={() => doCancel(o.id)} className="w-full mt-3 py-2 rounded-lg" style={{ border: `1px solid ${COLORS.danger}`, color: COLORS.danger, fontFamily: bodyFont, fontWeight: 700, fontSize: 11.5 }}>
+                  Cancel Order
+                </button>
+              )}
+            </div>
+          ))}
         </div>
       )}
-      <div className="flex flex-col gap-3">
-        {list.map((o) => (
-          <div key={o.id} className="rounded-2xl p-4" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
-            <div className="flex justify-between items-center mb-3">
-              <span style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>{o.id}</span>
-              <span style={{ fontFamily: monoFont, fontSize: 12, color: COLORS.primaryDark, fontWeight: 700 }}>{money(o.total)}</span>
-            </div>
-            <StatusStepper status={o.status} compact />
-            <p style={{ ...clamp1, fontFamily: bodyFont, fontSize: 11.5, color: COLORS.inkSoft, marginTop: 10 }}>{o.items.map((i) => i.name).join(', ')}</p>
-            {CANCELLABLE_STATUSES.includes(o.status) && (
-              <button onClick={() => doCancel(o.id)} className="w-full mt-3 py-2 rounded-lg" style={{ border: `1px solid ${COLORS.danger}`, color: COLORS.danger, fontFamily: bodyFont, fontWeight: 700, fontSize: 11.5 }}>
-                Cancel Order
-              </button>
-            )}
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
@@ -1367,6 +1422,33 @@ function AboutPage({ deliverySettings }) {
           </div>
           <ChevronRight size={16} color={COLORS.inkSoft} />
         </a>
+
+        <div className="rounded-xl p-3.5 mt-2.5" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+          <div className="flex items-center gap-3 mb-3">
+            <div className="rounded-full flex items-center justify-center" style={{ width: 36, height: 36, background: `${COLORS.blue}1A` }}>
+              <Smartphone size={17} color={COLORS.blue} />
+            </div>
+            <div className="flex-1">
+              <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>Install on iPhone / iPad</p>
+              <p style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft }}>Adds an app icon to your Home Screen</p>
+            </div>
+          </div>
+          <div className="flex flex-col gap-2 pl-1">
+            {[
+              'Open kuljeet-store.vercel.app in Safari (not Chrome).',
+              'Tap the Share icon at the bottom of the screen.',
+              'Scroll down and tap "Add to Home Screen".',
+              'Tap "Add" in the top right \u2014 done!',
+            ].map((step, i) => (
+              <div key={i} className="flex items-start gap-2.5">
+                <div className="rounded-full flex items-center justify-center flex-shrink-0" style={{ width: 18, height: 18, background: `${COLORS.blue}1A`, marginTop: 1 }}>
+                  <span style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 10, color: COLORS.blue }}>{i + 1}</span>
+                </div>
+                <p style={{ fontFamily: bodyFont, fontSize: 12, color: COLORS.inkSoft, lineHeight: 1.4 }}>{step}</p>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -1375,7 +1457,25 @@ function AboutPage({ deliverySettings }) {
 /* ---------------------------------- ADMIN ---------------------------------- */
 function AdminLogin({ onLogin, adminPassword }) {
   const [pw, setPw] = useState('');
+  const [email, setEmail] = useState('');
   const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const submitReal = async () => {
+    setErr(''); setBusy(true);
+    try {
+      const session = await sbAuthLogin(email.trim(), pw);
+      setAuthToken(session.access_token);
+      await window.storage.set('mm-admin-refresh', session.refresh_token);
+      onLogin(session.refresh_token, session.user && session.user.email ? session.user.email : email.trim());
+    } catch (e) {
+      setErr(e.message || 'Login failed.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const submitLocal = () => (pw === adminPassword ? onLogin() : setErr('Incorrect password. Please try again.'));
+
   return (
     <div className="flex flex-col items-center px-6 pt-20">
       <div className="rounded-full flex items-center justify-center mb-4" style={{ width: 56, height: 56, background: COLORS.cream }}>
@@ -1383,15 +1483,26 @@ function AdminLogin({ onLogin, adminPassword }) {
       </div>
       <h2 style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 19, color: COLORS.ink }}>Admin Dashboard</h2>
       <p style={{ fontFamily: bodyFont, fontSize: 12, color: COLORS.inkSoft, marginTop: 4, marginBottom: 20, textAlign: 'center' }}>Manage products, orders, delivery zones and more.</p>
-      <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder="Enter admin password" className="w-full px-4 py-3 rounded-xl mb-3" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none' }} />
-      {err && <p style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.danger, marginBottom: 8 }}>{err}</p>}
-      <button
-        onClick={() => (pw === adminPassword ? onLogin() : setErr('Incorrect password. Please try again.'))}
-        className="w-full py-3.5 rounded-xl"
-        style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 14 }}
-      >
-        Login
-      </button>
+
+      {BACKEND_ENABLED ? (
+        <>
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Admin email" className="w-full px-4 py-3 rounded-xl mb-2.5" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none' }} />
+          <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder="Password" className="w-full px-4 py-3 rounded-xl mb-3" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none' }} />
+          {err && <p style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.danger, marginBottom: 8 }}>{err}</p>}
+          <button onClick={submitReal} disabled={busy} className="w-full py-3.5 rounded-xl" style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 14, opacity: busy ? 0.7 : 1 }}>
+            {busy ? 'Logging in...' : 'Login'}
+          </button>
+          <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft, marginTop: 10, textAlign: 'center' }}>Log in with the admin account created in Supabase (Authentication &rarr; Users).</p>
+        </>
+      ) : (
+        <>
+          <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder="Enter admin password" className="w-full px-4 py-3 rounded-xl mb-3" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none' }} />
+          {err && <p style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.danger, marginBottom: 8 }}>{err}</p>}
+          <button onClick={submitLocal} className="w-full py-3.5 rounded-xl" style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 14 }}>
+            Login
+          </button>
+        </>
+      )}
     </div>
   );
 }
@@ -1628,7 +1739,7 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
   );
 }
 
-function AdminOrders({ orders, setOrders, whatsappNumber }) {
+function AdminOrders({ orders, setOrders, whatsappNumber, onRefresh, loading }) {
   const update = (id, status) => {
     setOrders(orders.map((o) => (o.id === id ? { ...o, status } : o)));
     if (BACKEND_ENABLED) sbUpdate('orders', `id=eq.${id}`, { status }).catch((e) => console.error('Order status failed to sync:', e));
@@ -1636,6 +1747,11 @@ function AdminOrders({ orders, setOrders, whatsappNumber }) {
   const sorted = [...orders].sort((a, b) => b.createdAt - a.createdAt);
   return (
     <div className="p-4">
+      {BACKEND_ENABLED && onRefresh && (
+        <button onClick={onRefresh} disabled={loading} className="w-full mb-3 py-2.5 rounded-lg flex items-center justify-center gap-2" style={{ border: `1px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: bodyFont, fontWeight: 700, fontSize: 12, opacity: loading ? 0.6 : 1 }}>
+          {loading ? 'Refreshing...' : 'Refresh Orders'}
+        </button>
+      )}
       {!sorted.length && <p style={{ fontFamily: bodyFont, color: COLORS.inkSoft, fontSize: 12.5, textAlign: 'center', marginTop: 40 }}>No orders yet.</p>}
       <div className="flex flex-col gap-3">
         {sorted.map((o) => (
@@ -1816,13 +1932,29 @@ function AdminDelivery({ settings, setSettings, categories }) {
   );
 }
 
-function AdminSecurity({ adminPassword, setAdminPassword }) {
+function AdminSecurity({ adminPassword, setAdminPassword, adminEmail }) {
   const [currentPw, setCurrentPw] = useState('');
   const [newPw, setNewPw] = useState('');
   const [confirmPw, setConfirmPw] = useState('');
   const [msg, setMsg] = useState(null); // { type: 'error' | 'success', text }
+  const [busy, setBusy] = useState(false);
 
-  const submit = () => {
+  const submitReal = async () => {
+    setMsg(null);
+    if (newPw.length < 6) return setMsg({ type: 'error', text: 'New password must be at least 6 characters.' });
+    if (newPw !== confirmPw) return setMsg({ type: 'error', text: 'New password and confirmation don\u2019t match.' });
+    setBusy(true);
+    try {
+      await sbAuthUpdatePassword(newPw);
+      setNewPw(''); setConfirmPw('');
+      setMsg({ type: 'success', text: 'Password updated. Use it next time you log in.' });
+    } catch (e) {
+      setMsg({ type: 'error', text: e.message || 'Could not update password.' });
+    } finally {
+      setBusy(false);
+    }
+  };
+  const submitLocal = () => {
     if (currentPw !== adminPassword) return setMsg({ type: 'error', text: 'Current password is incorrect.' });
     if (newPw.length < 4) return setMsg({ type: 'error', text: 'New password must be at least 4 characters.' });
     if (newPw !== confirmPw) return setMsg({ type: 'error', text: 'New password and confirmation don\u2019t match.' });
@@ -1838,12 +1970,25 @@ function AdminSecurity({ adminPassword, setAdminPassword }) {
           <KeyRound size={16} color={COLORS.primary} />
           <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>Change Admin Password</p>
         </div>
-        <input type="password" value={currentPw} onChange={(e) => setCurrentPw(e.target.value)} placeholder="Current password" className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }} />
-        <input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder="New password" className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }} />
-        <input type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} placeholder="Confirm new password" className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }} />
-        {msg && <p style={{ fontFamily: bodyFont, fontSize: 11.5, color: msg.type === 'error' ? COLORS.danger : COLORS.secondary }}>{msg.text}</p>}
-        <button onClick={submit} className="py-2.5 rounded-lg" style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>Update Password</button>
-        <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft }}>{BACKEND_ENABLED ? 'This password is shared across all browsers and devices.' : 'This password is stored only in this browser, not shared across devices, since Supabase isn\u2019t connected yet.'}</p>
+        {BACKEND_ENABLED ? (
+          <>
+            {adminEmail && <p style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft }}>Logged in as <span style={{ fontWeight: 700, color: COLORS.ink }}>{adminEmail}</span></p>}
+            <input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder="New password" className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }} />
+            <input type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} placeholder="Confirm new password" className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }} />
+            {msg && <p style={{ fontFamily: bodyFont, fontSize: 11.5, color: msg.type === 'error' ? COLORS.danger : COLORS.secondary }}>{msg.text}</p>}
+            <button onClick={submitReal} disabled={busy} className="py-2.5 rounded-lg" style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, opacity: busy ? 0.7 : 1 }}>{busy ? 'Updating...' : 'Update Password'}</button>
+            <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft }}>This is your real login \u2014 the same one used in Supabase (Authentication &rarr; Users). It works the same on every device.</p>
+          </>
+        ) : (
+          <>
+            <input type="password" value={currentPw} onChange={(e) => setCurrentPw(e.target.value)} placeholder="Current password" className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }} />
+            <input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder="New password" className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }} />
+            <input type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} placeholder="Confirm new password" className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }} />
+            {msg && <p style={{ fontFamily: bodyFont, fontSize: 11.5, color: msg.type === 'error' ? COLORS.danger : COLORS.secondary }}>{msg.text}</p>}
+            <button onClick={submitLocal} className="py-2.5 rounded-lg" style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>Update Password</button>
+            <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft }}>This password is stored only in this browser, not shared across devices, since Supabase isn\u2019t connected yet.</p>
+          </>
+        )}
       </div>
     </div>
   );
@@ -1881,7 +2026,7 @@ function AdminCustomers({ orders }) {
   );
 }
 
-function AdminPage({ products, setProducts, orders, setOrders, deliverySettings, setDeliverySettings, onLogout, adminPassword, setAdminPassword, allRealCategories, customCategories, setCustomCategories }) {
+function AdminPage({ products, setProducts, orders, setOrders, deliverySettings, setDeliverySettings, onLogout, adminPassword, setAdminPassword, allRealCategories, customCategories, setCustomCategories, adminEmail, onRefreshOrders, ordersLoading }) {
   const [tab, setTab] = useState('overview');
   return (
     <div className="pb-6">
@@ -1892,10 +2037,10 @@ function AdminPage({ products, setProducts, orders, setOrders, deliverySettings,
       <AdminTabs tab={tab} setTab={setTab} />
       {tab === 'overview' && <AdminOverview products={products} orders={orders} />}
       {tab === 'products' && <AdminProducts products={products} setProducts={setProducts} categories={allRealCategories} customCategories={customCategories} setCustomCategories={setCustomCategories} />}
-      {tab === 'orders' && <AdminOrders orders={orders} setOrders={setOrders} whatsappNumber={deliverySettings.whatsappNumber} />}
+      {tab === 'orders' && <AdminOrders orders={orders} setOrders={setOrders} whatsappNumber={deliverySettings.whatsappNumber} onRefresh={onRefreshOrders} loading={ordersLoading} />}
       {tab === 'delivery' && <AdminDelivery settings={deliverySettings} setSettings={setDeliverySettings} categories={allRealCategories} />}
       {tab === 'customers' && <AdminCustomers orders={orders} />}
-      {tab === 'security' && <AdminSecurity adminPassword={adminPassword} setAdminPassword={setAdminPassword} />}
+      {tab === 'security' && <AdminSecurity adminPassword={adminPassword} setAdminPassword={setAdminPassword} adminEmail={adminEmail} />}
     </div>
   );
 }
@@ -1914,6 +2059,8 @@ export default function App() {
   const [deliveryArea, setDeliveryArea] = useState('');
   const [showLocationModal, setShowLocationModal] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [adminEmail, setAdminEmail] = useState('');
+  const adminRefreshRef = useRef(null);
   const [adminPassword, setAdminPassword] = useState('admin123');
   const [customCategories, setCustomCategories] = useState([]);
   const [lastOrder, setLastOrder] = useState(null);
@@ -1952,6 +2099,23 @@ export default function App() {
       } catch (e) { /* keep defaults */ }
 
       if (BACKEND_ENABLED) {
+        try {
+          const savedOrders = await window.storage.get('mm-orders');
+          if (savedOrders && savedOrders.value) setOrders(JSON.parse(savedOrders.value));
+        } catch (e) { /* no local order history yet on this device */ }
+        try {
+          const savedRefresh = await window.storage.get('mm-admin-refresh');
+          if (savedRefresh && savedRefresh.value) {
+            const session = await sbAuthRefresh(savedRefresh.value);
+            setAuthToken(session.access_token);
+            adminRefreshRef.current = session.refresh_token;
+            window.storage.set('mm-admin-refresh', session.refresh_token).catch(() => {});
+            setAdminEmail(session.user && session.user.email ? session.user.email : '');
+            setIsAdmin(true);
+          }
+        } catch (e) {
+          window.storage.delete('mm-admin-refresh').catch(() => {});
+        }
         try {
           const [prodRows, settingsRows, pinRows] = await Promise.all([
             sbSelect('products', '?select=*'),
@@ -2027,6 +2191,19 @@ export default function App() {
   }, [adminPassword, loaded]);
   useEffect(() => { if (loaded) window.storage.set('mm-custom-categories', JSON.stringify(customCategories)).catch(() => {}); }, [customCategories, loaded]);
   useEffect(() => { if (loaded) window.storage.set('mm-theme', theme).catch(() => {}); }, [theme, loaded]);
+  useEffect(() => {
+    if (!BACKEND_ENABLED || !isAdmin) return;
+    const interval = setInterval(async () => {
+      if (!adminRefreshRef.current) return;
+      try {
+        const session = await sbAuthRefresh(adminRefreshRef.current);
+        setAuthToken(session.access_token);
+        adminRefreshRef.current = session.refresh_token;
+        window.storage.set('mm-admin-refresh', session.refresh_token).catch(() => {});
+      } catch (e) { /* will require re-login on next admin action if this keeps failing */ }
+    }, 45 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [isAdmin]);
 
   const nav = (page, params = {}) => { setRoute({ page, params }); window.scrollTo(0, 0); };
 
@@ -2076,6 +2253,24 @@ export default function App() {
   const cartCount = Object.values(cart).reduce((a, b) => a + b, 0);
 
   const buyNow = (product, n) => { addToCart(product, n); nav('checkout'); };
+
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const refreshOrders = async () => {
+    if (!BACKEND_ENABLED) return;
+    setOrdersLoading(true);
+    try {
+      const [orderRows, itemRows] = await Promise.all([
+        sbSelect('orders', '?select=*&order=created_at.desc'),
+        sbSelect('order_items', '?select=*'),
+      ]);
+      setOrders((orderRows || []).map((r) => mapOrderFromDb(r, itemRows || [])));
+    } catch (e) {
+      console.error('Could not load orders (are you logged in as admin?):', e);
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
+  useEffect(() => { if (isAdmin) refreshOrders(); }, [isAdmin]); // eslint-disable-line
 
   const placeOrder = (data) => {
     const order = {
@@ -2129,7 +2324,7 @@ export default function App() {
 
   const isAdminRoute = route.page === 'admin';
   const showHeader = !isAdminRoute && route.page !== 'product' && route.page !== 'checkout';
-  const showBackHeader = route.page === 'category' || route.page === 'product' || route.page === 'checkout' || route.page === 'list' || route.page === 'about';
+  const showBackHeader = route.page === 'category' || route.page === 'product' || route.page === 'checkout' || route.page === 'list' || route.page === 'about' || route.page === 'myorders';
 
   const headerTitleMap = {
     category: allCategories.find((c) => c.id === route.params.id)?.name,
@@ -2137,6 +2332,7 @@ export default function App() {
     checkout: 'Checkout',
     list: listTitle,
     about: 'About Us & Contact',
+    myorders: 'My Orders',
   };
 
   if (!loaded) {
@@ -2183,18 +2379,27 @@ export default function App() {
               : <div className="p-8 text-center" style={{ fontFamily: bodyFont, color: COLORS.inkSoft, fontSize: 13 }}>Your cart is empty.</div>
           )}
           {route.page === 'ordersuccess' && <OrderSuccessPage order={lastOrder} nav={nav} whatsappNumber={deliverySettings.whatsappNumber} orders={orders} setOrders={setOrders} />}
-          {route.page === 'myorders' && <MyOrdersPage orders={orders} setOrders={setOrders} lastMobile={lastMobile} />}
           {route.page === 'about' && <AboutPage deliverySettings={deliverySettings} />}
+          {route.page === 'myorders' && <MyOrdersPage orders={orders} setOrders={setOrders} nav={nav} />}
           {route.page === 'wishlist' && <WishlistPage products={products} wishlist={wishlist} nav={nav} onAdd={addToCart} cart={cart} onToggleWishlist={toggleWishlist} />}
-          {route.page === 'admin' && !isAdmin && <AdminLogin onLogin={() => setIsAdmin(true)} adminPassword={adminPassword} />}
+          {route.page === 'admin' && !isAdmin && <AdminLogin onLogin={(refreshToken, email) => { if (refreshToken) { adminRefreshRef.current = refreshToken; setAdminEmail(email || ''); } setIsAdmin(true); }} adminPassword={adminPassword} />}
           {route.page === 'admin' && isAdmin && (
             <AdminPage
               products={products} setProducts={setProducts}
               orders={orders} setOrders={setOrders}
               deliverySettings={deliverySettings} setDeliverySettings={setDeliverySettings}
-              onLogout={() => { setIsAdmin(false); nav('home'); }}
+              onLogout={() => {
+                setIsAdmin(false);
+                setAdminEmail('');
+                adminRefreshRef.current = null;
+                setAuthToken(null);
+                if (BACKEND_ENABLED) window.storage.delete('mm-admin-refresh').catch(() => {});
+                nav('home');
+              }}
               adminPassword={adminPassword} setAdminPassword={setAdminPassword}
               allRealCategories={allRealCategories} customCategories={customCategories} setCustomCategories={setCustomCategories}
+              adminEmail={adminEmail}
+              onRefreshOrders={refreshOrders} ordersLoading={ordersLoading}
             />
           )}
         </div>
