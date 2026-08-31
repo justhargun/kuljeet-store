@@ -1321,12 +1321,30 @@ function OrderSuccessPage({ order, nav, whatsappNumber, orders, setOrders }) {
 }
 
 function MyOrdersPage({ orders, setOrders, nav }) {
+  const [checking, setChecking] = useState(false);
+  useEffect(() => {
+    if (!BACKEND_ENABLED || !orders.length) return;
+    let cancelled = false;
+    setChecking(true);
+    Promise.all(orders.map((o) =>
+      sbRpc('get_order_status', { p_order_id: o.id, p_mobile: o.mobile }).catch(() => null)
+    )).then((results) => {
+      if (cancelled) return;
+      setOrders((current) => current.map((o) => {
+        const fresh = results.find((r) => r && r[0] && r[0].id === o.id);
+        return fresh && fresh[0] ? { ...o, status: fresh[0].status } : o;
+      }));
+    }).finally(() => { if (!cancelled) setChecking(false); });
+    return () => { cancelled = true; };
+  }, []); // eslint-disable-line
+
   const doCancel = (id) => {
     if (window.confirm('Cancel this order? This cannot be undone.')) cancelOrderById(id, orders, setOrders);
   };
   const sorted = [...orders].sort((a, b) => b.createdAt - a.createdAt);
   return (
     <div className="p-4 pb-10">
+      {checking && <p style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft, marginBottom: 10 }}>Checking for status updates&hellip;</p>}
       {!sorted.length ? (
         <div className="flex flex-col items-center py-16 gap-2">
           <ClipboardList size={34} color={COLORS.inkSoft} />
