@@ -1128,7 +1128,6 @@ function CheckoutPage({ cartItems, subtotal, deliverySettings, nav, placeOrder }
       if (!deliverySettings.upiId) return setError('UPI isn\u2019t set up yet. Please choose another payment method.');
       const link = buildUpiLink({ upiId: deliverySettings.upiId, amountRupees: total, shopName: deliverySettings.shopName, orderNote: `Order for ${form.name}` });
       setUpiLink(link);
-      window.location.href = link;
       setUpiPending(true);
       return;
     }
@@ -1157,9 +1156,9 @@ function CheckoutPage({ cartItems, subtotal, deliverySettings, nav, placeOrder }
         <div className="rounded-full flex items-center justify-center mb-4" style={{ width: 64, height: 64, background: COLORS.cream }}>
           <Smartphone size={28} color={COLORS.primary} />
         </div>
-        <h2 style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 19, color: COLORS.ink }}>Complete Your Payment</h2>
+        <h2 style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 19, color: COLORS.ink }}>Pay via UPI</h2>
         <p style={{ fontFamily: bodyFont, fontSize: 12.5, color: COLORS.inkSoft, marginTop: 8, lineHeight: 1.6, maxWidth: 320 }}>
-          Pay <strong>{money(total)}</strong> to <strong>{deliverySettings.upiId}</strong> using any UPI app. On iPhone, scanning the QR code below is the most reliable way.
+          Pay <strong>{money(total)}</strong> to <strong>{deliverySettings.upiId}</strong> using any UPI app. Scan the QR code below, or copy the UPI ID to pay manually.
         </p>
 
         <div className="mt-5 p-3 rounded-2xl" style={{ background: '#fff', border: `1px solid ${COLORS.border}` }}>
@@ -1179,7 +1178,7 @@ function CheckoutPage({ cartItems, subtotal, deliverySettings, nav, placeOrder }
         </button>
 
         <button onClick={() => { window.location.href = upiLink; }} className="w-full mt-6 py-3 rounded-xl" style={{ border: `1px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: bodyFont, fontWeight: 700, fontSize: 13 }}>
-          Try Opening UPI App Directly
+          Open in UPI App
         </button>
         <button onClick={confirmUpiPaid} disabled={paying} className="w-full mt-2.5 py-3.5 rounded-xl" style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 14, opacity: paying ? 0.7 : 1 }}>
           {paying ? 'Opening WhatsApp...' : 'I\u2019ve Paid \u2014 Notify Shop'}
