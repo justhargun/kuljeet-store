@@ -1064,8 +1064,11 @@ function CartPage({ cartItems, updateQty, removeItem, subtotal, nav }) {
                 <div className="flex items-center gap-2 px-2 py-1 rounded-full" style={{ border: `1px solid ${COLORS.border}` }}>
                   <button onClick={() => updateQty(item.id, item.qty - 1)}><Minus size={12} /></button>
                   <span style={{ fontFamily: monoFont, fontSize: 12, minWidth: 14, textAlign: 'center' }}>{item.qty}</span>
-                  <button onClick={() => updateQty(item.id, item.qty + 1)}><Plus size={12} /></button>
+                  <button onClick={() => updateQty(item.id, item.qty + 1)} disabled={item.qty >= (item.stock ?? Infinity)} style={{ opacity: item.qty >= (item.stock ?? Infinity) ? 0.35 : 1 }}><Plus size={12} /></button>
                 </div>
+                {item.qty >= (item.stock ?? Infinity) && (
+                  <span style={{ fontFamily: bodyFont, fontSize: 10, color: COLORS.inkSoft }}>Max in stock</span>
+                )}
                 <button onClick={() => removeItem(item.id)}><Trash2 size={14} color={COLORS.danger} /></button>
               </div>
             </div>
@@ -2079,11 +2082,19 @@ export default function App() {
   );
 
   const addToCart = (product, n = 1) => {
-    setCart((c) => ({ ...c, [product.id]: (c[product.id] || 0) + n }));
+    setCart((c) => {
+      const current = c[product.id] || 0;
+      const stock = product.stock ?? Infinity;
+      const next = Math.min(current + n, stock);
+      if (next <= 0) return c;
+      return { ...c, [product.id]: next };
+    });
   };
   const updateQty = (id, qty) => {
     if (qty <= 0) { const c = { ...cart }; delete c[id]; setCart(c); return; }
-    setCart((c) => ({ ...c, [id]: qty }));
+    const product = products.find((p) => p.id === id);
+    const stock = product ? (product.stock ?? Infinity) : Infinity;
+    setCart((c) => ({ ...c, [id]: Math.min(qty, stock) }));
   };
   const removeItem = (id) => { const c = { ...cart }; delete c[id]; setCart(c); };
 
