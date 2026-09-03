@@ -1,6 +1,9 @@
 // Minimal service worker: caches the app shell so it can open (and show
 // already-visited pages) even with no internet connection.
-const CACHE_NAME = 'kuljeet-store-v1';
+// v2: fetch now explicitly bypasses the browser's HTTP cache (cache: 'no-store')
+// so "network-first" actually means fresh-from-network, not a stale cached
+// response that technically counted as "successful".
+const CACHE_NAME = 'kuljeet-store-v2';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -20,7 +23,7 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.open(CACHE_NAME).then(async (cache) => {
       try {
-        const fresh = await fetch(event.request);
+        const fresh = await fetch(event.request, { cache: 'no-store' });
         cache.put(event.request, fresh.clone());
         return fresh;
       } catch (e) {
