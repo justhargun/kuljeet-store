@@ -432,21 +432,6 @@ function isShopOpen(settings) {
 
 const STATUS_STEPS = ['Order Received', 'Confirmed', 'Packing', 'Out for Delivery', 'Delivered'];
 const LOW_STOCK_THRESHOLD = 5;
-const CANCELLABLE_STATUSES = ['Order Received', 'Confirmed'];
-function mapOrderFromDb(row, itemRows = []) {
-  return {
-    id: row.id, name: row.customer_name, mobile: row.mobile, address: row.address, pincode: row.pincode, area: row.area,
-    items: itemRows.filter((i) => i.order_id === row.id).map((i) => ({ id: i.product_id, name: i.name, price: Number(i.price), qty: i.qty })),
-    subtotal: Number(row.subtotal), deliveryCharge: Number(row.delivery_charge), total: Number(row.total),
-    payment: row.payment, paymentId: row.payment_ref || null, status: row.status,
-    createdAt: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
-  };
-}
-function cancelOrderById(id, orders, setOrders) {
-  const order = orders.find((o) => o.id === id);
-  setOrders(orders.map((o) => (o.id === id ? { ...o, status: 'Cancelled' } : o)));
-  if (BACKEND_ENABLED && order) sbRpc('cancel_order', { p_order_id: id, p_mobile: order.mobile }).catch((e) => console.error('Order cancellation failed to sync:', e));
-}
 
 /* -------------------------------- SMALL PARTS -------------------------------- */
 function PriceTag({ price, mrp, size = 'md' }) {
@@ -463,46 +448,6 @@ function PriceTag({ price, mrp, size = 'md' }) {
           MRP {money(mrp)} &middot; {off}% off
         </span>
       )}
-    </div>
-  );
-}
-
-function StatusStepper({ status, compact }) {
-  if (status === 'Cancelled') {
-    return (
-      <div className="flex items-center gap-2 py-1">
-        <div className="rounded-full flex items-center justify-center" style={{ width: compact ? 18 : 26, height: compact ? 18 : 26, background: COLORS.danger }}>
-          <X size={compact ? 11 : 14} color="#fff" />
-        </div>
-        <span style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: compact ? 11.5 : 13, color: COLORS.danger }}>Order Cancelled</span>
-      </div>
-    );
-  }
-  const idx = Math.max(0, STATUS_STEPS.indexOf(status));
-  return (
-    <div className="flex items-start w-full">
-      {STATUS_STEPS.map((s, i) => (
-        <div key={s} className="flex-1 flex flex-col items-center relative">
-          {i > 0 && (
-            <div className="absolute" style={{ top: compact ? 9 : 13, right: '50%', width: '100%', height: 2, background: i <= idx ? COLORS.secondary : COLORS.border, zIndex: 0 }} />
-          )}
-          <div
-            className="rounded-full flex items-center justify-center relative"
-            style={{ width: compact ? 18 : 26, height: compact ? 18 : 26, background: i <= idx ? COLORS.secondary : '#fff', border: `2px solid ${i <= idx ? COLORS.secondary : COLORS.border}`, zIndex: 1 }}
-          >
-            {i < idx || (i === idx && status === 'Delivered') ? (
-              <Check size={compact ? 11 : 14} color="#fff" />
-            ) : i === idx ? (
-              <div className="rounded-full" style={{ width: 7, height: 7, background: COLORS.card }} />
-            ) : null}
-          </div>
-          {!compact && (
-            <span className="text-center mt-2" style={{ fontSize: 10, color: i <= idx ? COLORS.ink : COLORS.inkSoft, fontFamily: bodyFont, fontWeight: i === idx ? 700 : 500 }}>
-              {s}
-            </span>
-          )}
-        </div>
-      ))}
     </div>
   );
 }
@@ -871,10 +816,7 @@ function HomePage({ products, nav, onAdd, cart, area, categories, deliverySettin
         ))}
       </div>
 
-      <button onClick={() => nav('myorders')} className="w-full mt-7 py-3.5 flex items-center justify-center gap-1.5" style={{ borderTop: `1px solid ${COLORS.border}`, color: COLORS.inkSoft, fontFamily: bodyFont, fontSize: 12, fontWeight: 600 }}>
-        My Orders <ChevronRight size={14} />
-      </button>
-      <button onClick={() => nav('about')} className="w-full py-3.5 flex items-center justify-center gap-1.5" style={{ borderTop: `1px solid ${COLORS.border}`, color: COLORS.inkSoft, fontFamily: bodyFont, fontSize: 12, fontWeight: 600 }}>
+      <button onClick={() => nav('about')} className="w-full mt-7 py-3.5 flex items-center justify-center gap-1.5" style={{ borderTop: `1px solid ${COLORS.border}`, color: COLORS.inkSoft, fontFamily: bodyFont, fontSize: 12, fontWeight: 600 }}>
         About Us & Contact <ChevronRight size={14} />
       </button>
     </div>
@@ -1146,10 +1088,12 @@ function CartPage({ cartItems, updateQty, removeItem, subtotal, nav }) {
 
 function CheckoutPage({ cartItems, subtotal, deliverySettings, nav, placeOrder }) {
   const [form, setForm] = useState({ name: '', mobile: '', address: '', pincode: '' });
-  const [payment, setPayment] = useState('cod');
+  const [payment, setPayment] = useState('upi');
   const [zone, setZone] = useState(null);
   const [error, setError] = useState('');
   const [paying, setPaying] = useState(false);
+  const [upiPending, setUpiPending] = useState(false);
+  const [upiLink, setUpiLink] = useState('');
 
   useEffect(() => {
     if (form.pincode.length === 6) setZone(checkDeliveryZone(form.pincode, deliverySettings));
@@ -1175,20 +1119,77 @@ function CheckoutPage({ cartItems, subtotal, deliverySettings, nav, placeOrder }
     if (payment === 'online' && RAZORPAY_ENABLED) {
       setPaying(true);
       const result = await payWithRazorpay({ amountRupees: total, shopName: deliverySettings.shopName, customerName: form.name, customerMobile: form.mobile });
+      if (!result.success) { setPaying(false); return setError(result.error || 'Payment could not be completed.'); }
+      await placeOrder({ ...form, payment, deliveryCharge, total, subtotal, area: zone.area, paymentId: result.paymentId });
       setPaying(false);
-      if (!result.success) return setError(result.error || 'Payment could not be completed.');
-      placeOrder({ ...form, payment, deliveryCharge, total, subtotal, area: zone.area, paymentId: result.paymentId });
       return;
     }
     if (payment === 'upi') {
       if (!deliverySettings.upiId) return setError('UPI isn\u2019t set up yet. Please choose another payment method.');
       const link = buildUpiLink({ upiId: deliverySettings.upiId, amountRupees: total, shopName: deliverySettings.shopName, orderNote: `Order for ${form.name}` });
+      setUpiLink(link);
       window.location.href = link;
-      placeOrder({ ...form, payment, deliveryCharge, total, subtotal, area: zone.area });
+      setUpiPending(true);
       return;
     }
-    placeOrder({ ...form, payment, deliveryCharge, total, subtotal, area: zone.area });
+    setPaying(true);
+    await placeOrder({ ...form, payment, deliveryCharge, total, subtotal, area: zone.area });
+    setPaying(false);
   };
+
+  const confirmUpiPaid = async () => {
+    setPaying(true);
+    await placeOrder({ ...form, payment, deliveryCharge, total, subtotal, area: zone.area });
+    setPaying(false);
+  };
+
+  const [copied, setCopied] = useState(false);
+  const copyUpiId = () => {
+    navigator.clipboard.writeText(deliverySettings.upiId).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {});
+  };
+
+  if (upiPending) {
+    return (
+      <div className="p-4 pb-10 flex flex-col items-center text-center pt-8">
+        <div className="rounded-full flex items-center justify-center mb-4" style={{ width: 64, height: 64, background: COLORS.cream }}>
+          <Smartphone size={28} color={COLORS.primary} />
+        </div>
+        <h2 style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 19, color: COLORS.ink }}>Complete Your Payment</h2>
+        <p style={{ fontFamily: bodyFont, fontSize: 12.5, color: COLORS.inkSoft, marginTop: 8, lineHeight: 1.6, maxWidth: 320 }}>
+          Pay <strong>{money(total)}</strong> to <strong>{deliverySettings.upiId}</strong> using any UPI app. On iPhone, scanning the QR code below is the most reliable way.
+        </p>
+
+        <div className="mt-5 p-3 rounded-2xl" style={{ background: '#fff', border: `1px solid ${COLORS.border}` }}>
+          <img
+            src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(upiLink)}`}
+            alt="UPI payment QR code"
+            width={220}
+            height={220}
+            style={{ display: 'block' }}
+          />
+        </div>
+        <p style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft, marginTop: 8 }}>Scan this with your UPI app&rsquo;s scanner</p>
+
+        <button onClick={copyUpiId} className="flex items-center gap-2 mt-4 px-4 py-2 rounded-full" style={{ border: `1px solid ${COLORS.border}` }}>
+          <span style={{ fontFamily: monoFont, fontSize: 12.5, color: COLORS.ink }}>{deliverySettings.upiId}</span>
+          <span style={{ fontFamily: bodyFont, fontSize: 11, fontWeight: 700, color: copied ? COLORS.secondary : COLORS.primary }}>{copied ? 'Copied!' : 'Copy'}</span>
+        </button>
+
+        <button onClick={() => { window.location.href = upiLink; }} className="w-full mt-6 py-3 rounded-xl" style={{ border: `1px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: bodyFont, fontWeight: 700, fontSize: 13 }}>
+          Try Opening UPI App Directly
+        </button>
+        <button onClick={confirmUpiPaid} disabled={paying} className="w-full mt-2.5 py-3.5 rounded-xl" style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 14, opacity: paying ? 0.7 : 1 }}>
+          {paying ? 'Opening WhatsApp...' : 'I\u2019ve Paid \u2014 Notify Shop'}
+        </button>
+        <button onClick={() => setUpiPending(false)} className="w-full mt-2.5 py-3" style={{ color: COLORS.inkSoft, fontFamily: bodyFont, fontSize: 12.5 }}>
+          Cancel &amp; Change Payment Method
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 pb-32">
@@ -1221,10 +1222,6 @@ function CheckoutPage({ cartItems, subtotal, deliverySettings, nav, placeOrder }
 
       <h2 style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 13, color: COLORS.ink, margin: '18px 0 8px' }}>Payment Method</h2>
       <div className="flex flex-col gap-2">
-        <button onClick={() => setPayment('cod')} className="flex items-center gap-3 px-4 py-3 rounded-xl" style={{ border: `2px solid ${payment === 'cod' ? COLORS.primary : COLORS.border}` }}>
-          <Banknote size={17} color={COLORS.ink} />
-          <span style={{ fontFamily: bodyFont, fontSize: 13, fontWeight: 600, color: COLORS.ink }}>Cash on Delivery</span>
-        </button>
         <button onClick={() => setPayment('upi')} className="flex items-center gap-3 px-4 py-3 rounded-xl" style={{ border: `2px solid ${payment === 'upi' ? COLORS.primary : COLORS.border}` }}>
           <Smartphone size={17} color={COLORS.ink} />
           <span style={{ fontFamily: bodyFont, fontSize: 13, fontWeight: 600, color: COLORS.ink }}>UPI (Google Pay / PhonePe / Paytm)</span>
@@ -1265,111 +1262,10 @@ function CheckoutPage({ cartItems, subtotal, deliverySettings, nav, placeOrder }
       <div className="fixed left-0 right-0 flex justify-center z-40" style={{ bottom: 58 }}>
         <div className="w-full p-4" style={{ background: COLORS.card, borderTop: `1px solid ${COLORS.border}`, maxWidth: 448, boxShadow: '0 -6px 18px rgba(43,32,19,0.10)' }}>
           <button onClick={submit} disabled={paying || shopClosed} className="w-full py-3.5 rounded-xl" style={{ background: paying || shopClosed ? COLORS.border : COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 14, boxShadow: paying || shopClosed ? 'none' : '0 4px 10px rgba(217,115,13,0.35)' }}>
-            {shopClosed ? 'Store Closed' : paying ? 'Opening payment...' : payment === 'online' && RAZORPAY_ENABLED ? `Pay ${money(total)} Now` : payment === 'upi' ? `Pay ${money(total)} via UPI` : `Place Order \u00b7 ${money(total)}`}
+            {shopClosed ? 'Store Closed' : paying ? 'Opening WhatsApp...' : payment === 'online' && RAZORPAY_ENABLED ? `Pay ${money(total)} Now` : payment === 'upi' ? `Pay ${money(total)} via UPI` : `Place Order \u00b7 ${money(total)}`}
           </button>
         </div>
       </div>
-    </div>
-  );
-}
-
-function OrderSuccessPage({ order, nav, whatsappNumber, orders, setOrders }) {
-  if (!order) return null;
-  const liveOrder = (orders && orders.find((o) => o.id === order.id)) || order;
-  const msg = `New order ${order.id} from ${order.name} (${order.mobile}).\nAddress: ${order.address}, ${order.pincode} (${order.area || ''}).\nItems:\n${order.items.map((i) => `- ${i.name} x${i.qty} = ${money(i.price * i.qty)}`).join('\n')}\nDelivery: ${order.deliveryCharge === 0 ? 'FREE' : money(order.deliveryCharge)}\nTotal: ${money(order.total)}\nPayment: ${paymentLabel(order.payment)}${order.paymentId ? ' (' + order.paymentId + ')' : ''}`;
-  const waLink = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(msg)}`;
-  const canCancel = CANCELLABLE_STATUSES.includes(liveOrder.status);
-  const doCancel = () => {
-    if (window.confirm('Cancel this order? This cannot be undone.')) cancelOrderById(order.id, orders, setOrders);
-  };
-  return (
-    <div className="p-5 flex flex-col items-center pb-10">
-      <div className="rounded-full flex items-center justify-center mb-3" style={{ width: 60, height: 60, background: COLORS.successTint }}>
-        <CheckCircle2 size={32} color={COLORS.secondary} />
-      </div>
-      <h2 style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 19, color: COLORS.ink }}>Order Placed!</h2>
-      <p style={{ fontFamily: bodyFont, fontSize: 12.5, color: COLORS.inkSoft, marginTop: 2 }}>Order ID: {order.id}</p>
-      {order.paymentId && <p style={{ fontFamily: monoFont, fontSize: 10.5, color: COLORS.secondary, marginTop: 2 }}>Payment ref: {order.paymentId}</p>}
-
-      <div className="w-full mt-6 rounded-2xl p-4" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
-        <StatusStepper status={liveOrder.status} />
-      </div>
-
-      {canCancel && (
-        <button onClick={doCancel} className="w-full mt-3 py-3 rounded-xl" style={{ border: `1px solid ${COLORS.danger}`, color: COLORS.danger, fontFamily: bodyFont, fontWeight: 700, fontSize: 13 }}>
-          Cancel Order
-        </button>
-      )}
-
-      <div className="w-full mt-4 rounded-2xl p-4 flex flex-col gap-1.5" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
-        {order.items.map((i) => (
-          <div key={i.id} className="flex justify-between"><span style={{ fontFamily: bodyFont, fontSize: 12, color: COLORS.ink }}>{i.name} &times; {i.qty}</span><span style={{ fontFamily: monoFont, fontSize: 12, color: COLORS.ink }}>{money(i.price * i.qty)}</span></div>
-        ))}
-        <div className="flex justify-between pt-2 mt-1" style={{ borderTop: `1px dashed ${COLORS.border}` }}>
-          <span style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 13, color: COLORS.ink }}>Total</span>
-          <span style={{ fontFamily: monoFont, fontWeight: 700, fontSize: 13, color: COLORS.ink }}>{money(order.total)}</span>
-        </div>
-      </div>
-
-      <a href={waLink} target="_blank" rel="noopener noreferrer" className="w-full mt-4 py-3.5 rounded-xl flex items-center justify-center gap-2" style={{ background: '#1EA556', color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 13.5 }}>
-        <MessageCircle size={17} /> Notify Shop on WhatsApp
-      </a>
-      <button onClick={() => nav('myorders')} className="w-full mt-2.5 py-3 rounded-xl" style={{ border: `1px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: bodyFont, fontWeight: 700, fontSize: 13 }}>My Orders</button>
-      <button onClick={() => nav('home')} className="w-full mt-2.5 py-3" style={{ color: COLORS.inkSoft, fontFamily: bodyFont, fontSize: 12.5 }}>Continue Shopping</button>
-    </div>
-  );
-}
-
-function MyOrdersPage({ orders, setOrders, nav }) {
-  const [checking, setChecking] = useState(false);
-  useEffect(() => {
-    if (!BACKEND_ENABLED || !orders.length) return;
-    let cancelled = false;
-    setChecking(true);
-    Promise.all(orders.map((o) =>
-      sbRpc('get_order_status', { p_order_id: o.id, p_mobile: o.mobile }).catch(() => null)
-    )).then((results) => {
-      if (cancelled) return;
-      setOrders((current) => current.map((o) => {
-        const fresh = results.find((r) => r && r[0] && r[0].id === o.id);
-        return fresh && fresh[0] ? { ...o, status: fresh[0].status } : o;
-      }));
-    }).finally(() => { if (!cancelled) setChecking(false); });
-    return () => { cancelled = true; };
-  }, []); // eslint-disable-line
-
-  const doCancel = (id) => {
-    if (window.confirm('Cancel this order? This cannot be undone.')) cancelOrderById(id, orders, setOrders);
-  };
-  const sorted = [...orders].sort((a, b) => b.createdAt - a.createdAt);
-  return (
-    <div className="p-4 pb-10">
-      {checking && <p style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft, marginBottom: 10 }}>Checking for status updates&hellip;</p>}
-      {!sorted.length ? (
-        <div className="flex flex-col items-center py-16 gap-2">
-          <ClipboardList size={34} color={COLORS.inkSoft} />
-          <p style={{ fontFamily: bodyFont, color: COLORS.inkSoft, fontSize: 12.5, textAlign: 'center' }}>No orders placed from this device yet.</p>
-          <button onClick={() => nav('home')} className="mt-2 px-4 py-2 rounded-full" style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>Start Shopping</button>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-3">
-          {sorted.map((o) => (
-            <div key={o.id} className="rounded-2xl p-4" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
-              <div className="flex justify-between items-center mb-3">
-                <span style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>{o.id}</span>
-                <span style={{ fontFamily: monoFont, fontSize: 12, color: COLORS.primaryDark, fontWeight: 700 }}>{money(o.total)}</span>
-              </div>
-              <StatusStepper status={o.status} compact />
-              <p style={{ ...clamp1, fontFamily: bodyFont, fontSize: 11.5, color: COLORS.inkSoft, marginTop: 10 }}>{o.items.map((i) => i.name).join(', ')}</p>
-              {CANCELLABLE_STATUSES.includes(o.status) && (
-                <button onClick={() => doCancel(o.id)} className="w-full mt-3 py-2 rounded-lg" style={{ border: `1px solid ${COLORS.danger}`, color: COLORS.danger, fontFamily: bodyFont, fontWeight: 700, fontSize: 11.5 }}>
-                  Cancel Order
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -1529,7 +1425,6 @@ function AdminTabs({ tab, setTab }) {
   const tabs = [
     { id: 'overview', label: 'Overview', Icon: BarChart3 },
     { id: 'products', label: 'Products', Icon: Package },
-    { id: 'orders', label: 'Orders', Icon: ClipboardList },
     { id: 'delivery', label: 'Delivery', Icon: Truck },
     { id: 'customers', label: 'Customers', Icon: Users },
     { id: 'security', label: 'Security', Icon: KeyRound },
@@ -1752,47 +1647,6 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
             </div>
           );
         })}
-      </div>
-    </div>
-  );
-}
-
-function AdminOrders({ orders, setOrders, whatsappNumber, onRefresh, loading }) {
-  const update = (id, status) => {
-    setOrders(orders.map((o) => (o.id === id ? { ...o, status } : o)));
-    if (BACKEND_ENABLED) sbUpdate('orders', `id=eq.${id}`, { status }).catch((e) => console.error('Order status failed to sync:', e));
-  };
-  const sorted = [...orders].sort((a, b) => b.createdAt - a.createdAt);
-  return (
-    <div className="p-4">
-      {BACKEND_ENABLED && onRefresh && (
-        <button onClick={onRefresh} disabled={loading} className="w-full mb-3 py-2.5 rounded-lg flex items-center justify-center gap-2" style={{ border: `1px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: bodyFont, fontWeight: 700, fontSize: 12, opacity: loading ? 0.6 : 1 }}>
-          {loading ? 'Refreshing...' : 'Refresh Orders'}
-        </button>
-      )}
-      {!sorted.length && <p style={{ fontFamily: bodyFont, color: COLORS.inkSoft, fontSize: 12.5, textAlign: 'center', marginTop: 40 }}>No orders yet.</p>}
-      <div className="flex flex-col gap-3">
-        {sorted.map((o) => (
-          <div key={o.id} className="rounded-2xl p-4" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
-            <div className="flex justify-between items-start mb-2">
-              <div>
-                <span style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>{o.id}</span>
-                <p style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.inkSoft }}>{o.name} &bull; {o.mobile}</p>
-              </div>
-              <a href={`https://wa.me/91${o.mobile}`} target="_blank" rel="noopener noreferrer"><MessageCircle size={17} color="#1EA556" /></a>
-            </div>
-            <p style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft, marginBottom: 6 }}>{o.address}, {o.pincode}</p>
-            <p style={{ ...clamp1, fontFamily: bodyFont, fontSize: 11.5, color: COLORS.ink, marginBottom: 8 }}>{o.items.map((i) => `${i.name} x${i.qty}`).join(', ')}</p>
-            <div className="flex items-center justify-between mb-3">
-              <span style={{ fontFamily: monoFont, fontSize: 13, fontWeight: 700, color: COLORS.ink }}>{money(o.total)}</span>
-              <Badge bg={o.payment === 'cod' ? COLORS.gold : o.payment === 'upi' ? COLORS.purple : COLORS.secondary}>{o.payment === 'cod' ? 'COD' : o.payment === 'upi' ? 'UPI' : 'ONLINE'}</Badge>
-            </div>
-            <select value={o.status} onChange={(e) => update(o.id, e.target.value)} className="w-full px-3 py-2 rounded-lg" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12, fontWeight: 700, color: o.status === 'Cancelled' ? COLORS.danger : COLORS.ink }}>
-              {STATUS_STEPS.map((s) => <option key={s} value={s}>{s}</option>)}
-              <option value="Cancelled">Cancelled</option>
-            </select>
-          </div>
-        ))}
       </div>
     </div>
   );
@@ -2044,7 +1898,7 @@ function AdminCustomers({ orders }) {
   );
 }
 
-function AdminPage({ products, setProducts, orders, setOrders, deliverySettings, setDeliverySettings, onLogout, adminPassword, setAdminPassword, allRealCategories, customCategories, setCustomCategories, adminEmail, onRefreshOrders, ordersLoading }) {
+function AdminPage({ products, setProducts, orders, deliverySettings, setDeliverySettings, onLogout, adminPassword, setAdminPassword, allRealCategories, customCategories, setCustomCategories, adminEmail }) {
   const [tab, setTab] = useState('overview');
   return (
     <div className="pb-6">
@@ -2055,7 +1909,6 @@ function AdminPage({ products, setProducts, orders, setOrders, deliverySettings,
       <AdminTabs tab={tab} setTab={setTab} />
       {tab === 'overview' && <AdminOverview products={products} orders={orders} />}
       {tab === 'products' && <AdminProducts products={products} setProducts={setProducts} categories={allRealCategories} customCategories={customCategories} setCustomCategories={setCustomCategories} />}
-      {tab === 'orders' && <AdminOrders orders={orders} setOrders={setOrders} whatsappNumber={deliverySettings.whatsappNumber} onRefresh={onRefreshOrders} loading={ordersLoading} />}
       {tab === 'delivery' && <AdminDelivery settings={deliverySettings} setSettings={setDeliverySettings} categories={allRealCategories} />}
       {tab === 'customers' && <AdminCustomers orders={orders} />}
       {tab === 'security' && <AdminSecurity adminPassword={adminPassword} setAdminPassword={setAdminPassword} adminEmail={adminEmail} />}
@@ -2069,7 +1922,7 @@ export default function App() {
   const [theme, setTheme] = useState('light');
   applyTheme(theme); // mutate the shared COLORS object before this render's JSX reads it
   const [products, setProducts] = useState(SEED_PRODUCTS);
-  const [orders, setOrders] = useState([]);
+  const [orders] = useState([]);
   const [deliverySettings, setDeliverySettings] = useState(SEED_DELIVERY);
   const [cart, setCart] = useState({});
   const [route, setRoute] = useState({ page: 'home', params: {} });
@@ -2081,8 +1934,6 @@ export default function App() {
   const adminRefreshRef = useRef(null);
   const [adminPassword, setAdminPassword] = useState('admin123');
   const [customCategories, setCustomCategories] = useState([]);
-  const [lastOrder, setLastOrder] = useState(null);
-  const [lastMobile, setLastMobile] = useState('');
   const [reviews, setReviews] = useState([]);
   const [wishlist, setWishlist] = useState({});
 
@@ -2117,10 +1968,6 @@ export default function App() {
       } catch (e) { /* keep defaults */ }
 
       if (BACKEND_ENABLED) {
-        try {
-          const savedOrders = await window.storage.get('mm-orders');
-          if (savedOrders && savedOrders.value) setOrders(JSON.parse(savedOrders.value));
-        } catch (e) { /* no local order history yet on this device */ }
         try {
           const savedRefresh = await window.storage.get('mm-admin-refresh');
           if (savedRefresh && savedRefresh.value) {
@@ -2182,13 +2029,11 @@ export default function App() {
       try {
         const results = await Promise.allSettled([
           window.storage.get('mm-products'),
-          window.storage.get('mm-orders'),
           window.storage.get('mm-delivery'),
           window.storage.get('mm-reviews'),
         ]);
-        const [p, o, d, rv] = results.map((r) => (r.status === 'fulfilled' ? r.value : null));
+        const [p, d, rv] = results.map((r) => (r.status === 'fulfilled' ? r.value : null));
         if (p && p.value) setProducts(JSON.parse(p.value));
-        if (o && o.value) setOrders(JSON.parse(o.value));
         if (d && d.value) setDeliverySettings({ ...SEED_DELIVERY, ...JSON.parse(d.value) });
         if (rv && rv.value) setReviews(JSON.parse(rv.value));
       } catch (e) { /* fall back to seed data */ }
@@ -2197,7 +2042,6 @@ export default function App() {
   }, []);
 
   useEffect(() => { if (loaded && !BACKEND_ENABLED) window.storage.set('mm-products', JSON.stringify(products)).catch(() => {}); }, [products, loaded]);
-  useEffect(() => { if (loaded) window.storage.set('mm-orders', JSON.stringify(orders)).catch(() => {}); }, [orders, loaded]);
   useEffect(() => { if (loaded && !BACKEND_ENABLED) window.storage.set('mm-delivery', JSON.stringify(deliverySettings)).catch(() => {}); }, [deliverySettings, loaded]);
   useEffect(() => { if (loaded) window.storage.set('mm-cart', JSON.stringify(cart)).catch(() => {}); }, [cart, loaded]);
   useEffect(() => { if (loaded) window.storage.set('mm-wishlist', JSON.stringify(wishlist)).catch(() => {}); }, [wishlist, loaded]);
@@ -2272,46 +2116,13 @@ export default function App() {
 
   const buyNow = (product, n) => { addToCart(product, n); nav('checkout'); };
 
-  const [ordersLoading, setOrdersLoading] = useState(false);
-  const refreshOrders = async () => {
-    if (!BACKEND_ENABLED) return;
-    setOrdersLoading(true);
-    try {
-      const [orderRows, itemRows] = await Promise.all([
-        sbSelect('orders', '?select=*&order=created_at.desc'),
-        sbSelect('order_items', '?select=*'),
-      ]);
-      setOrders((orderRows || []).map((r) => mapOrderFromDb(r, itemRows || [])));
-    } catch (e) {
-      console.error('Could not load orders (are you logged in as admin?):', e);
-    } finally {
-      setOrdersLoading(false);
-    }
-  };
-  useEffect(() => { if (isAdmin) refreshOrders(); }, [isAdmin]); // eslint-disable-line
-
   const placeOrder = (data) => {
-    const order = {
-      id: 'ORD' + String(Date.now()).slice(-6),
-      name: data.name, mobile: data.mobile, address: data.address, pincode: data.pincode, area: data.area,
-      items: cartItems.map((i) => ({ id: i.id, name: i.name, price: i.price, qty: i.qty })),
-      subtotal: data.subtotal, deliveryCharge: data.deliveryCharge, total: data.total, payment: data.payment,
-      paymentId: data.paymentId || null, status: 'Order Received', createdAt: Date.now(),
-    };
-    setOrders((o) => [...o, order]);
+    const orderId = 'ORD' + String(Date.now()).slice(-6);
+    const items = cartItems.map((i) => ({ id: i.id, name: i.name, price: i.price, qty: i.qty }));
+    const msg = `New order ${orderId} from ${data.name} (${data.mobile}).\nAddress: ${data.address}, ${data.pincode} (${data.area || ''}).\nItems:\n${items.map((i) => `- ${i.name} x${i.qty} = ${money(i.price * i.qty)}`).join('\n')}\nDelivery: ${data.deliveryCharge === 0 ? 'FREE' : money(data.deliveryCharge)}\nTotal: ${money(data.total)}\nPayment: ${paymentLabel(data.payment)}${data.paymentId ? ' (' + data.paymentId + ')' : ''}`;
+    const waLink = `https://wa.me/${deliverySettings.whatsappNumber}?text=${encodeURIComponent(msg)}`;
     setCart({});
-    setLastOrder(order);
-    setLastMobile(data.mobile);
-    if (BACKEND_ENABLED) {
-      sbInsert('orders', [{
-        id: order.id, customer_name: order.name, mobile: order.mobile, address: order.address, pincode: order.pincode,
-        area: order.area, subtotal: order.subtotal, delivery_charge: order.deliveryCharge, total: order.total,
-        payment: order.payment, status: order.status, payment_ref: order.paymentId,
-      }])
-        .then(() => sbInsert('order_items', order.items.map((i) => ({ order_id: order.id, product_id: i.id, name: i.name, price: i.price, qty: i.qty }))))
-        .catch((e) => console.error('Order saved locally, but syncing to Supabase failed:', e));
-    }
-    nav('ordersuccess');
+    window.location.href = waLink;
   };
 
   const filteredForSearch = useMemo(() => {
@@ -2342,7 +2153,7 @@ export default function App() {
 
   const isAdminRoute = route.page === 'admin';
   const showHeader = !isAdminRoute && route.page !== 'product' && route.page !== 'checkout';
-  const showBackHeader = route.page === 'category' || route.page === 'product' || route.page === 'checkout' || route.page === 'list' || route.page === 'about' || route.page === 'myorders';
+  const showBackHeader = route.page === 'category' || route.page === 'product' || route.page === 'checkout' || route.page === 'list' || route.page === 'about';
 
   const headerTitleMap = {
     category: allCategories.find((c) => c.id === route.params.id)?.name,
@@ -2350,7 +2161,6 @@ export default function App() {
     checkout: 'Checkout',
     list: listTitle,
     about: 'About Us & Contact',
-    myorders: 'My Orders',
   };
 
   if (!loaded) {
@@ -2396,15 +2206,13 @@ export default function App() {
               ? <CheckoutPage cartItems={cartItems} subtotal={subtotal} deliverySettings={deliverySettings} nav={nav} placeOrder={placeOrder} />
               : <div className="p-8 text-center" style={{ fontFamily: bodyFont, color: COLORS.inkSoft, fontSize: 13 }}>Your cart is empty.</div>
           )}
-          {route.page === 'ordersuccess' && <OrderSuccessPage order={lastOrder} nav={nav} whatsappNumber={deliverySettings.whatsappNumber} orders={orders} setOrders={setOrders} />}
           {route.page === 'about' && <AboutPage deliverySettings={deliverySettings} />}
-          {route.page === 'myorders' && <MyOrdersPage orders={orders} setOrders={setOrders} nav={nav} />}
           {route.page === 'wishlist' && <WishlistPage products={products} wishlist={wishlist} nav={nav} onAdd={addToCart} cart={cart} onToggleWishlist={toggleWishlist} />}
           {route.page === 'admin' && !isAdmin && <AdminLogin onLogin={(refreshToken, email) => { if (refreshToken) { adminRefreshRef.current = refreshToken; setAdminEmail(email || ''); } setIsAdmin(true); }} adminPassword={adminPassword} />}
           {route.page === 'admin' && isAdmin && (
             <AdminPage
               products={products} setProducts={setProducts}
-              orders={orders} setOrders={setOrders}
+              orders={orders}
               deliverySettings={deliverySettings} setDeliverySettings={setDeliverySettings}
               onLogout={() => {
                 setIsAdmin(false);
@@ -2417,7 +2225,6 @@ export default function App() {
               adminPassword={adminPassword} setAdminPassword={setAdminPassword}
               allRealCategories={allRealCategories} customCategories={customCategories} setCustomCategories={setCustomCategories}
               adminEmail={adminEmail}
-              onRefreshOrders={refreshOrders} ordersLoading={ordersLoading}
             />
           )}
         </div>
