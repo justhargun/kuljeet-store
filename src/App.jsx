@@ -5,7 +5,7 @@ import {
   Wind, Heart, Palette, Baby, Sun, Tag, Lock, Truck, CreditCard, Banknote,
   MessageCircle, Trash2, PlusCircle, BarChart3, Users,
   ClipboardList, AlertCircle, CheckCircle2, ArrowLeft,
-  LogOut, Flower, ShoppingBasket, Smartphone, ImagePlus, KeyRound, Moon
+  LogOut, Flower, ShoppingBasket, Smartphone, ImagePlus, KeyRound, Moon, FileText, ShieldCheck
 } from 'lucide-react';
 
 if (typeof window !== 'undefined' && !window.storage) {
@@ -1266,13 +1266,19 @@ function CheckoutPage({ cartItems, subtotal, deliverySettings, nav, placeOrder }
           <button onClick={submit} disabled={paying || shopClosed} className="w-full py-3.5 rounded-xl" style={{ background: paying || shopClosed ? COLORS.border : COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 14, boxShadow: paying || shopClosed ? 'none' : '0 4px 10px rgba(217,115,13,0.35)' }}>
             {shopClosed ? 'Store Closed' : paying ? 'Opening WhatsApp...' : payment === 'online' && RAZORPAY_ENABLED ? `Pay ${money(total)} Now` : payment === 'upi' ? `Pay ${money(total)} via UPI` : `Place Order \u00b7 ${money(total)}`}
           </button>
+          <p style={{ fontFamily: bodyFont, fontSize: 10, color: COLORS.inkSoft, textAlign: 'center', marginTop: 8, lineHeight: 1.4 }}>
+            By placing this order, you agree to our{' '}
+            <span onClick={() => nav('terms')} style={{ textDecoration: 'underline', cursor: 'pointer' }}>Terms &amp; Conditions</span>
+            {' '}and{' '}
+            <span onClick={() => nav('privacy')} style={{ textDecoration: 'underline', cursor: 'pointer' }}>Privacy Policy</span>.
+          </p>
         </div>
       </div>
     </div>
   );
 }
 
-function AboutPage({ deliverySettings }) {
+function AboutPage({ deliverySettings, nav }) {
   const shopOpen = isShopOpen(deliverySettings);
   const waMsg = encodeURIComponent(`Hi ${deliverySettings.shopName || 'Kuljeet Store'}, I have a question about your store.`);
   return (
@@ -1366,6 +1372,230 @@ function AboutPage({ deliverySettings }) {
           </div>
         </div>
       </div>
+
+      <div>
+        <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 13, color: COLORS.ink, marginBottom: 10 }}>Help</p>
+        <button onClick={() => nav('faq')} className="w-full flex items-center gap-3 rounded-xl p-3.5 text-left" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+          <div className="rounded-full flex items-center justify-center" style={{ width: 36, height: 36, background: `${COLORS.blue}1A` }}>
+            <ClipboardList size={17} color={COLORS.blue} />
+          </div>
+          <div className="flex-1">
+            <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>Frequently Asked Questions</p>
+          </div>
+          <ChevronRight size={16} color={COLORS.inkSoft} />
+        </button>
+      </div>
+
+      <div>
+        <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 13, color: COLORS.ink, marginBottom: 10 }}>Legal</p>
+        <div className="flex flex-col gap-2.5">
+          <button onClick={() => nav('terms')} className="flex items-center gap-3 rounded-xl p-3.5 text-left" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+            <div className="rounded-full flex items-center justify-center" style={{ width: 36, height: 36, background: `${COLORS.primary}1A` }}>
+              <FileText size={17} color={COLORS.primary} />
+            </div>
+            <div className="flex-1">
+              <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>Terms &amp; Conditions</p>
+            </div>
+            <ChevronRight size={16} color={COLORS.inkSoft} />
+          </button>
+          <button onClick={() => nav('privacy')} className="flex items-center gap-3 rounded-xl p-3.5 text-left" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+            <div className="rounded-full flex items-center justify-center" style={{ width: 36, height: 36, background: `${COLORS.secondary}1A` }}>
+              <ShieldCheck size={17} color={COLORS.secondary} />
+            </div>
+            <div className="flex-1">
+              <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>Privacy Policy</p>
+            </div>
+            <ChevronRight size={16} color={COLORS.inkSoft} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------------- ADMIN ---------------------------------- */
+function LegalSection({ heading, children }) {
+  return (
+    <div>
+      <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 13, color: COLORS.ink, marginBottom: 6 }}>{heading}</p>
+      <div style={{ fontFamily: bodyFont, fontSize: 12.5, color: COLORS.inkSoft, lineHeight: 1.65 }}>{children}</div>
+    </div>
+  );
+}
+
+function FAQPage({ deliverySettings }) {
+  const [openIdx, setOpenIdx] = useState(0);
+  const shopName = deliverySettings.shopName || 'Kuljeet Store';
+  const faqs = [
+    {
+      q: 'Do you deliver to my area?',
+      a: `We deliver to the pincodes listed as serviceable at checkout. Enter your pincode on the home page or at checkout to check if we cover your area.`,
+    },
+    {
+      q: 'What payment methods do you accept?',
+      a: `We currently accept UPI payments only, paid directly through your own UPI app (GPay, PhonePe, Paytm, etc.). We don't accept cash on delivery right now.`,
+    },
+    {
+      q: 'How do I place an order?',
+      a: `Add items to your cart, go to checkout, and fill in your details. When you tap the order button, it opens WhatsApp with your order details pre-filled \u2014 just hit send and we'll confirm it with you there.`,
+    },
+    {
+      q: 'How long does delivery take?',
+      a: `Delivery times can vary a bit depending on your area and how busy we are, but we get orders out as quickly as we can once confirmed. Feel free to ask us on WhatsApp for an estimate for your area.`,
+    },
+    {
+      q: 'Can I cancel or change my order after placing it?',
+      a: `Yes, message us on WhatsApp as soon as possible. If your order hasn't been packed or dispatched yet, we can usually cancel or update it.`,
+    },
+    {
+      q: 'What if my order arrives damaged, wrong, or incomplete?',
+      a: `Message us on WhatsApp within 48 hours of delivery with your order details and photos if possible, and we'll sort out a replacement or refund.`,
+    },
+    {
+      q: 'Do you have a physical store I can visit?',
+      a: `Message us on WhatsApp or check our About page for our contact details and current store timings.`,
+    },
+    {
+      q: 'Is my payment and personal information safe?',
+      a: `Yes. Payments go directly through your own UPI app \u2014 we never see your UPI PIN or banking details. See our Privacy Policy for more on how we handle your information.`,
+    },
+    {
+      q: 'Do I need to create an account to shop?',
+      a: `No account needed. Just browse, add items to your cart, and check out \u2014 your cart and wishlist are saved on your own device.`,
+    },
+  ];
+
+  return (
+    <div className="p-4 pb-10 flex flex-col gap-5">
+      <div>
+        <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 13, color: COLORS.ink, marginBottom: 4 }}>Frequently Asked Questions</p>
+        <p style={{ fontFamily: bodyFont, fontSize: 12, color: COLORS.inkSoft }}>Quick answers about shopping with {shopName}. Can't find what you need? Reach us on WhatsApp at +{deliverySettings.whatsappNumber}.</p>
+      </div>
+
+      <div className="flex flex-col gap-2.5">
+        {faqs.map((item, i) => {
+          const open = openIdx === i;
+          return (
+            <div key={i} className="rounded-xl overflow-hidden" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+              <button onClick={() => setOpenIdx(open ? -1 : i)} className="w-full flex items-center gap-3 p-3.5 text-left">
+                <span className="flex-1" style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>{item.q}</span>
+                <ChevronDown size={16} color={COLORS.inkSoft} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+              </button>
+              {open && (
+                <div className="px-3.5 pb-3.5" style={{ marginTop: -4 }}>
+                  <p style={{ fontFamily: bodyFont, fontSize: 12, color: COLORS.inkSoft, lineHeight: 1.6 }}>{item.a}</p>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function TermsPage({ deliverySettings }) {
+  const shopName = deliverySettings.shopName || 'Kuljeet Store';
+  return (
+    <div className="p-4 pb-10 flex flex-col gap-5">
+      <p style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft }}>Last updated: {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+
+      <LegalSection heading="1. About These Terms">
+        <p>These Terms &amp; Conditions govern your use of {shopName} and any orders you place with us. By browsing this site or placing an order, you agree to these terms. If you don&apos;t agree, please don&apos;t use the site.</p>
+      </LegalSection>
+
+      <LegalSection heading="2. Orders">
+        <p>Placing an order sends your order details to us directly on WhatsApp. An order is only confirmed once we reply to you on WhatsApp confirming it &mdash; adding items to your cart or reaching the checkout screen does not by itself confirm an order. We may decline or cancel an order, including for reasons like an item being out of stock or delivery not being available to your address, in which case we&apos;ll let you know.</p>
+      </LegalSection>
+
+      <LegalSection heading="3. Pricing">
+        <p>All prices are listed in Indian Rupees (INR) and include applicable taxes unless stated otherwise. We try to keep prices and product information accurate, but errors can occasionally happen; if we find a pricing error on your order, we&apos;ll contact you before proceeding.</p>
+      </LegalSection>
+
+      <LegalSection heading="4. Payment">
+        <p>We currently accept payment via UPI. Payment is made directly through your own UPI app to the UPI ID shown at checkout; we do not collect or store your UPI PIN or banking credentials at any point.</p>
+      </LegalSection>
+
+      <LegalSection heading="5. Delivery">
+        <p>We deliver to the pincodes listed as serviceable at checkout. Delivery times are estimates and may vary due to factors outside our control, such as weather, traffic, or courier delays.</p>
+      </LegalSection>
+
+      <LegalSection heading="6. Cancellations, Returns &amp; Refunds">
+        <p>Since orders are confirmed directly with us on WhatsApp, please contact us there as soon as possible if you need to cancel or change an order &mdash; we can usually accommodate this if the order hasn&apos;t been packed or dispatched yet. For issues with a delivered order, such as a damaged, incorrect, or missing item, contact us on WhatsApp within 48 hours of delivery with your order details and photos where relevant, and we&apos;ll work with you on a replacement or refund.</p>
+      </LegalSection>
+
+      <LegalSection heading="7. Product Information">
+        <p>We make a genuine effort to keep product descriptions, images, and stock levels accurate and up to date. Actual products may vary slightly from images shown (e.g. packaging updates by the manufacturer).</p>
+      </LegalSection>
+
+      <LegalSection heading="8. Account &amp; Content">
+        <p>You don&apos;t need to create an account to shop with us. If you leave a product review, you&apos;re confirming it reflects your genuine experience, and you agree we may display it publicly on the site.</p>
+      </LegalSection>
+
+      <LegalSection heading="9. Limitation of Liability">
+        <p>We aren&apos;t liable for indirect or incidental losses arising from use of this site or delayed deliveries beyond our reasonable control. Nothing here limits any rights you have under Indian consumer protection law.</p>
+      </LegalSection>
+
+      <LegalSection heading="10. Changes to These Terms">
+        <p>We may update these terms from time to time. Continuing to use the site or place orders after changes are posted means you accept the updated terms.</p>
+      </LegalSection>
+
+      <LegalSection heading="11. Contact Us">
+        <p>Questions about these terms? Reach us on WhatsApp at +{deliverySettings.whatsappNumber}.</p>
+      </LegalSection>
+    </div>
+  );
+}
+
+function PrivacyPage({ deliverySettings }) {
+  const shopName = deliverySettings.shopName || 'Kuljeet Store';
+  return (
+    <div className="p-4 pb-10 flex flex-col gap-5">
+      <p style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft }}>Last updated: {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+
+      <LegalSection heading="1. Overview">
+        <p>This Privacy Policy explains what information {shopName} collects when you use this site, and how it&apos;s used. We collect the minimum we need to take and deliver your order.</p>
+      </LegalSection>
+
+      <LegalSection heading="2. Information We Collect">
+        <p>When you check out, we collect the details you enter: your name, mobile number, delivery address, and pincode. This information is sent directly to us via WhatsApp when you place an order and is not stored in any separate order database.</p>
+      </LegalSection>
+
+      <LegalSection heading="3. Information Stored On Your Device">
+        <p>Your cart and wishlist are saved locally on your own device/browser so they&apos;re there next time you visit &mdash; we don&apos;t have access to this and it isn&apos;t sent to us until you actually check out.</p>
+      </LegalSection>
+
+      <LegalSection heading="4. Payments">
+        <p>Payments are made directly through your own UPI app. We never see or store your UPI PIN, card numbers, or banking credentials &mdash; that happens entirely within your payment app.</p>
+      </LegalSection>
+
+      <LegalSection heading="5. Product Reviews">
+        <p>If you submit a product review, the name and comment you provide are displayed publicly on the relevant product page.</p>
+      </LegalSection>
+
+      <LegalSection heading="6. How We Use Your Information">
+        <p>We use the details you provide solely to fulfil your order &mdash; confirming it, delivering it, and contacting you if there&apos;s an issue. We don&apos;t sell your information to anyone.</p>
+      </LegalSection>
+
+      <LegalSection heading="7. WhatsApp">
+        <p>Orders and support conversations happen over WhatsApp, which is operated by WhatsApp/Meta under their own privacy policy. Messages you send us there are subject to WhatsApp&apos;s terms in addition to this policy.</p>
+      </LegalSection>
+
+      <LegalSection heading="8. Data Security">
+        <p>We take reasonable steps to protect the information you share with us. However, no method of transmission over the internet is 100% secure, so we can&apos;t guarantee absolute security.</p>
+      </LegalSection>
+
+      <LegalSection heading="9. Children's Privacy">
+        <p>This site is not directed at children, and we don&apos;t knowingly collect information from anyone under 18.</p>
+      </LegalSection>
+
+      <LegalSection heading="10. Changes to This Policy">
+        <p>We may update this policy from time to time; the &quot;Last updated&quot; date at the top will reflect the latest revision.</p>
+      </LegalSection>
+
+      <LegalSection heading="11. Contact Us">
+        <p>Questions about how your information is handled? Reach us on WhatsApp at +{deliverySettings.whatsappNumber}.</p>
+      </LegalSection>
     </div>
   );
 }
@@ -2131,6 +2361,13 @@ export default function App() {
     const items = cartItems.map((i) => ({ id: i.id, name: i.name, price: i.price, qty: i.qty }));
     const msg = `New order ${orderId} from ${data.name} (${data.mobile}).\nAddress: ${data.address}, ${data.pincode} (${data.area || ''}).\nItems:\n${items.map((i) => `- ${i.name} x${i.qty} = ${money(i.price * i.qty)}`).join('\n')}\nDelivery: ${data.deliveryCharge === 0 ? 'FREE' : money(data.deliveryCharge)}\nTotal: ${money(data.total)}\nPayment: ${paymentLabel(data.payment)}${data.paymentId ? ' (' + data.paymentId + ')' : ''}`;
     const waLink = `https://wa.me/${deliverySettings.whatsappNumber}?text=${encodeURIComponent(msg)}`;
+    if (BACKEND_ENABLED) {
+      sbRpc('decrement_stock', { items: items.map((i) => ({ id: i.id, qty: i.qty })) }).catch((e) => console.error('Stock decrement failed to sync:', e));
+    }
+    setProducts(products.map((p) => {
+      const bought = items.find((i) => i.id === p.id);
+      return bought ? { ...p, stock: Math.max((p.stock ?? 0) - bought.qty, 0) } : p;
+    }));
     setCart({});
     window.location.href = waLink;
   };
@@ -2163,7 +2400,7 @@ export default function App() {
 
   const isAdminRoute = route.page === 'admin';
   const showHeader = !isAdminRoute && route.page !== 'product' && route.page !== 'checkout';
-  const showBackHeader = route.page === 'category' || route.page === 'product' || route.page === 'checkout' || route.page === 'list' || route.page === 'about';
+  const showBackHeader = route.page === 'category' || route.page === 'product' || route.page === 'checkout' || route.page === 'list' || route.page === 'about' || route.page === 'terms' || route.page === 'privacy' || route.page === 'faq';
 
   const headerTitleMap = {
     category: allCategories.find((c) => c.id === route.params.id)?.name,
@@ -2171,6 +2408,9 @@ export default function App() {
     checkout: 'Checkout',
     list: listTitle,
     about: 'About Us & Contact',
+    terms: 'Terms & Conditions',
+    privacy: 'Privacy Policy',
+    faq: 'FAQs',
   };
 
   if (!loaded) {
@@ -2216,7 +2456,10 @@ export default function App() {
               ? <CheckoutPage cartItems={cartItems} subtotal={subtotal} deliverySettings={deliverySettings} nav={nav} placeOrder={placeOrder} />
               : <div className="p-8 text-center" style={{ fontFamily: bodyFont, color: COLORS.inkSoft, fontSize: 13 }}>Your cart is empty.</div>
           )}
-          {route.page === 'about' && <AboutPage deliverySettings={deliverySettings} />}
+          {route.page === 'about' && <AboutPage deliverySettings={deliverySettings} nav={nav} />}
+          {route.page === 'faq' && <FAQPage deliverySettings={deliverySettings} />}
+          {route.page === 'terms' && <TermsPage deliverySettings={deliverySettings} />}
+          {route.page === 'privacy' && <PrivacyPage deliverySettings={deliverySettings} />}
           {route.page === 'wishlist' && <WishlistPage products={products} wishlist={wishlist} nav={nav} onAdd={addToCart} cart={cart} onToggleWishlist={toggleWishlist} />}
           {route.page === 'admin' && !isAdmin && <AdminLogin onLogin={(refreshToken, email) => { if (refreshToken) { adminRefreshRef.current = refreshToken; setAdminEmail(email || ''); } setIsAdmin(true); }} adminPassword={adminPassword} />}
           {route.page === 'admin' && isAdmin && (
