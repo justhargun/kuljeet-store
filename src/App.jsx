@@ -82,8 +82,28 @@ const DARK_THEME = {
 // COLORS is a single mutable object (not reassigned) so every component reading
 // COLORS.xxx at render time picks up whichever theme is currently active.
 const COLORS = { ...LIGHT_THEME };
-function applyTheme(mode) {
+function isBannerActive(ds) {
+  if (!ds || !ds.bannerEnabled) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (ds.bannerStartDate) {
+    const s = new Date(ds.bannerStartDate + 'T00:00:00');
+    if (today < s) return false;
+  }
+  if (ds.bannerEndDate) {
+    const e = new Date(ds.bannerEndDate + 'T23:59:59');
+    if (today > e) return false;
+  }
+  return true;
+}
+function applyTheme(mode, deliverySettings) {
   Object.assign(COLORS, mode === 'dark' ? DARK_THEME : LIGHT_THEME);
+  // While a festive banner is live, tint the app's primary accent (buttons,
+  // highlights) to match it, so the celebration isn't confined to the banner.
+  if (isBannerActive(deliverySettings)) {
+    COLORS.primary = deliverySettings.bannerColor1;
+    COLORS.primaryDark = deliverySettings.bannerColor2;
+  }
 }
 const displayFont = "'Fraunces', Georgia, serif";
 const bodyFont = "'Manrope', system-ui, sans-serif";
@@ -282,6 +302,8 @@ function mapDeliveryFromDb(row, pinRows) {
     bannerEmoji: row.banner_emoji || '\ud83c\udf89',
     bannerColor1: row.banner_color1 || '#D9730D',
     bannerColor2: row.banner_color2 || '#B23A5C',
+    bannerStartDate: row.banner_start_date || '',
+    bannerEndDate: row.banner_end_date || '',
     pincodes: (pinRows || []).map((p) => ({ pincode: p.pincode, area: p.area })),
   };
 }
@@ -391,6 +413,8 @@ const SEED_DELIVERY = {
   bannerEmoji: '\ud83c\udf89',
   bannerColor1: '#D9730D',
   bannerColor2: '#B23A5C',
+  bannerStartDate: '',
+  bannerEndDate: '',
 };
 // Demo-only distance lookup, used when the shop chooses radius-based delivery.
 // In production this would call a maps/geocoding API instead of a fixed table.
@@ -457,6 +481,31 @@ function Badge({ children, bg, color = '#fff' }) {
     <span className="px-2 py-0.5 rounded-full font-semibold" style={{ background: bg, color, fontSize: 10, fontFamily: bodyFont }}>
       {children}
     </span>
+  );
+}
+
+function FestiveSparkles({ count = 9 }) {
+  const sparkles = useMemo(() => Array.from({ length: count }, () => ({
+    left: Math.random() * 92 + 2,
+    top: Math.random() * 80 + 4,
+    delay: Math.random() * 2.5,
+    duration: 1.8 + Math.random() * 1.8,
+    size: 10 + Math.random() * 12,
+  })), [count]);
+  return (
+    <div className="absolute inset-0" style={{ pointerEvents: 'none', zIndex: 0 }}>
+      <style>{`
+        @keyframes festiveTwinkle {
+          0%, 100% { opacity: 0; transform: scale(0.35) rotate(-8deg); }
+          50% { opacity: 1; transform: scale(1) rotate(10deg); }
+        }
+      `}</style>
+      {sparkles.map((s, i) => (
+        <span key={i} style={{ position: 'absolute', left: `${s.left}%`, top: `${s.top}%`, fontSize: s.size, animation: `festiveTwinkle ${s.duration}s ease-in-out ${s.delay}s infinite` }}>
+          {i % 3 === 0 ? '\u2728' : i % 3 === 1 ? '\u2b50' : '\u2726'}
+        </span>
+      ))}
+    </div>
   );
 }
 
@@ -770,17 +819,20 @@ function HomePage({ products, nav, onAdd, cart, area, categories, deliverySettin
   const recommended = [...products].sort((a, b) => b.rating - a.rating).slice(0, 8);
   return (
     <div className="pb-6">
-      {deliverySettings && deliverySettings.bannerEnabled && (
+      {isBannerActive(deliverySettings) && (
         <div className="mx-4 mt-1 mb-5 rounded-2xl p-5 relative overflow-hidden" style={{ background: `linear-gradient(120deg, ${deliverySettings.bannerColor1}, ${deliverySettings.bannerColor2})` }}>
-          {deliverySettings.bannerTitle && (
-            <h2 style={{ fontFamily: displayFont, fontWeight: 700, fontStyle: 'italic', fontSize: 24, color: '#fff', lineHeight: 1.15 }}>{deliverySettings.bannerTitle}</h2>
-          )}
-          {deliverySettings.bannerSubtitle && (
-            <p style={{ fontFamily: bodyFont, fontSize: 13, color: '#fff', opacity: 0.92, marginTop: 4 }}>{deliverySettings.bannerSubtitle}</p>
-          )}
-          <button onClick={() => nav('category', { id: deliverySettings.bannerCategory })} className="mt-4 px-4 py-2 rounded-full" style={{ background: COLORS.card, color: COLORS.primaryDark, fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>
-            {deliverySettings.bannerCta || 'Shop Now'}
-          </button>
+          <FestiveSparkles />
+          <div className="relative" style={{ zIndex: 1 }}>
+            {deliverySettings.bannerTitle && (
+              <h2 style={{ fontFamily: displayFont, fontWeight: 700, fontStyle: 'italic', fontSize: 24, color: '#fff', lineHeight: 1.15 }}>{deliverySettings.bannerTitle}</h2>
+            )}
+            {deliverySettings.bannerSubtitle && (
+              <p style={{ fontFamily: bodyFont, fontSize: 13, color: '#fff', opacity: 0.92, marginTop: 4 }}>{deliverySettings.bannerSubtitle}</p>
+            )}
+            <button onClick={() => nav('category', { id: deliverySettings.bannerCategory })} className="mt-4 px-4 py-2 rounded-full" style={{ background: COLORS.card, color: COLORS.primaryDark, fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>
+              {deliverySettings.bannerCta || 'Shop Now'}
+            </button>
+          </div>
           <span className="absolute" style={{ right: -10, bottom: -20, fontSize: 90, opacity: 0.25 }}>{deliverySettings.bannerEmoji}</span>
         </div>
       )}
@@ -1139,9 +1191,10 @@ function CheckoutPage({ cartItems, subtotal, deliverySettings, nav, placeOrder }
     setPaying(false);
   };
 
+  const [upiRef, setUpiRef] = useState('');
   const confirmUpiPaid = async () => {
     setPaying(true);
-    await placeOrder({ ...form, payment, deliveryCharge, total, subtotal, area: zone.area });
+    await placeOrder({ ...form, payment, deliveryCharge, total, subtotal, area: zone.area, paymentId: upiRef.trim() || undefined });
     setPaying(false);
   };
 
@@ -1161,8 +1214,23 @@ function CheckoutPage({ cartItems, subtotal, deliverySettings, nav, placeOrder }
         </div>
         <h2 style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 19, color: COLORS.ink }}>Pay via UPI</h2>
         <p style={{ fontFamily: bodyFont, fontSize: 12.5, color: COLORS.inkSoft, marginTop: 8, lineHeight: 1.6, maxWidth: 320 }}>
-          Pay <strong>{money(total)}</strong> to <strong>{deliverySettings.upiId}</strong> using any UPI app. Scan the QR code below, or copy the UPI ID to pay manually.
+          Pay <strong>{money(total)}</strong> to <strong>{deliverySettings.upiId}</strong>.
         </p>
+
+        <div className="mt-4 p-4 rounded-2xl text-left w-full" style={{ background: COLORS.cream, border: `1px solid ${COLORS.border}`, maxWidth: 320 }}>
+          <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12, color: COLORS.ink, marginBottom: 8 }}>How to pay:</p>
+          {[
+            'Open the UPI app your bank account is actually on (GPay, PhonePe, Paytm, etc.) \u2014 not just whichever app opens by itself.',
+            'In that app, tap Scan & Pay and scan the QR code below.',
+            `Confirm the amount \u2014 ${money(total)} \u2014 and complete the payment in your app.`,
+            'Come back here and tap "I\u2019ve Paid \u2014 Notify Shop".',
+          ].map((step, i) => (
+            <div key={i} className="flex gap-2.5" style={{ marginTop: i === 0 ? 0 : 8 }}>
+              <span className="flex items-center justify-center flex-shrink-0" style={{ width: 18, height: 18, borderRadius: 999, background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 10.5, marginTop: 1 }}>{i + 1}</span>
+              <p style={{ fontFamily: bodyFont, fontSize: 12, color: COLORS.ink, lineHeight: 1.5 }}>{step}</p>
+            </div>
+          ))}
+        </div>
 
         <div className="mt-5 p-3 rounded-2xl" style={{ background: '#fff', border: `1px solid ${COLORS.border}` }}>
           <img
@@ -1180,10 +1248,20 @@ function CheckoutPage({ cartItems, subtotal, deliverySettings, nav, placeOrder }
           <span style={{ fontFamily: bodyFont, fontSize: 11, fontWeight: 700, color: copied ? COLORS.secondary : COLORS.primary }}>{copied ? 'Copied!' : 'Copy'}</span>
         </button>
 
-        <button onClick={() => { window.location.href = upiLink; }} className="w-full mt-6 py-3 rounded-xl" style={{ border: `1px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: bodyFont, fontWeight: 700, fontSize: 13 }}>
+        <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft, marginTop: 14, maxWidth: 300 }}>
+          Prefer not to scan? This button below opens whichever UPI app your phone defaults to \u2014 only use it if that&rsquo;s the app your bank account is on.
+        </p>
+        <button onClick={() => { window.location.href = upiLink; }} className="w-full mt-2 py-3 rounded-xl" style={{ border: `1px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: bodyFont, fontWeight: 700, fontSize: 13 }}>
           Open in UPI App
         </button>
-        <button onClick={confirmUpiPaid} disabled={paying} className="w-full mt-2.5 py-3.5 rounded-xl" style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 14, opacity: paying ? 0.7 : 1 }}>
+
+        <label className="w-full flex flex-col gap-1 mt-5 text-left" style={{ maxWidth: 320 }}>
+          <span style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft, fontWeight: 700 }}>UPI transaction / UTR number (optional)</span>
+          <input value={upiRef} onChange={(e) => setUpiRef(e.target.value)} placeholder="From your payment app's success screen" className="px-3 py-2.5 rounded-lg w-full" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 12.5, outline: 'none' }} />
+          <span style={{ fontFamily: bodyFont, fontSize: 10, color: COLORS.inkSoft }}>Adding this helps the shop confirm your payment faster.</span>
+        </label>
+
+        <button onClick={confirmUpiPaid} disabled={paying} className="w-full mt-4 py-3.5 rounded-xl" style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 14, opacity: paying ? 0.7 : 1 }}>
           {paying ? 'Opening WhatsApp...' : 'I\u2019ve Paid \u2014 Notify Shop'}
         </button>
         <button onClick={() => setUpiPending(false)} className="w-full mt-2.5 py-3" style={{ color: COLORS.inkSoft, fontFamily: bodyFont, fontSize: 12.5 }}>
@@ -1898,6 +1976,7 @@ function AdminDelivery({ settings, setSettings, categories }) {
         banner_enabled: local.bannerEnabled, banner_title: local.bannerTitle, banner_subtitle: local.bannerSubtitle,
         banner_cta: local.bannerCta, banner_category: local.bannerCategory, banner_emoji: local.bannerEmoji,
         banner_color1: local.bannerColor1, banner_color2: local.bannerColor2,
+        banner_start_date: local.bannerStartDate || null, banner_end_date: local.bannerEndDate || null,
       }).catch((e) => console.error('Delivery settings failed to sync:', e));
       const prevPins = new Set(settings.pincodes.map((p) => p.pincode));
       const nextPins = new Set(local.pincodes.map((p) => p.pincode));
@@ -1987,6 +2066,24 @@ function AdminDelivery({ settings, setSettings, categories }) {
 
         {local.bannerEnabled && (
           <div className="flex flex-col gap-3 mt-1">
+            <div>
+              <span style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft, fontWeight: 700 }}>Quick fill (optional)</span>
+              <div className="flex gap-2 mt-2 flex-wrap">
+                {[
+                  { name: 'Diwali', title: 'Diwali Dhamaka', subtitle: 'Flat 25% off on Gift Hampers', emoji: '\ud83e\udd6f', c1: '#C9971E', c2: '#8A1F1F' },
+                  { name: 'Holi', title: 'Holi Hai!', subtitle: 'Colourful deals on your favourites', emoji: '\ud83c\udf88', c1: '#C13584', c2: '#5B3A9B' },
+                  { name: 'Eid', title: 'Eid Mubarak', subtitle: 'Special Eid offers, just for you', emoji: '\ud83c\udf19', c1: '#0E6E5C', c2: '#146B3A' },
+                  { name: 'Raksha Bandhan', title: 'Raksha Bandhan Special', subtitle: 'Gift ideas your siblings will love', emoji: '\ud83c\udf80', c1: '#D9730D', c2: '#B23A5C' },
+                  { name: 'Christmas', title: 'Merry Christmas', subtitle: 'Festive deals all season long', emoji: '\ud83c\udf84', c1: '#146B3A', c2: '#B3282D' },
+                  { name: 'New Year', title: 'New Year, New Deals', subtitle: 'Start the year with big savings', emoji: '\ud83c\udf86', c1: '#3E7FB0', c2: '#6B4A9E' },
+                ].map((p) => (
+                  <button key={p.name} onClick={() => setLocal({ ...local, bannerTitle: p.title, bannerSubtitle: p.subtitle, bannerEmoji: p.emoji, bannerColor1: p.c1, bannerColor2: p.c2 })} className="px-3 py-1.5 rounded-full" style={{ border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 11.5, color: COLORS.ink, background: COLORS.card }}>
+                    {p.emoji} {p.name}
+                  </button>
+                ))}
+              </div>
+              <p style={{ fontFamily: bodyFont, fontSize: 10, color: COLORS.inkSoft, marginTop: 4 }}>Fills in the fields below \u2014 tweak anything after picking one.</p>
+            </div>
             {field('Title (e.g. Diwali Dhamaka)', local.bannerTitle, (e) => setLocal({ ...local, bannerTitle: e.target.value }))}
             {field('Subtitle (e.g. Flat 25% off on Gift Hampers)', local.bannerSubtitle, (e) => setLocal({ ...local, bannerSubtitle: e.target.value }))}
             <div className="flex gap-3">
@@ -2013,11 +2110,28 @@ function AdminDelivery({ settings, setSettings, categories }) {
                 ))}
               </div>
             </div>
+            <div>
+              <span style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft, fontWeight: 700 }}>Auto on/off (optional)</span>
+              <div className="flex gap-3 mt-2">
+                <label className="flex-1 flex flex-col gap-1">
+                  <span style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft }}>Start date</span>
+                  <input type="date" value={local.bannerStartDate} onChange={(e) => setLocal({ ...local, bannerStartDate: e.target.value })} className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 12.5, outline: 'none' }} />
+                </label>
+                <label className="flex-1 flex flex-col gap-1">
+                  <span style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft }}>End date</span>
+                  <input type="date" value={local.bannerEndDate} onChange={(e) => setLocal({ ...local, bannerEndDate: e.target.value })} className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 12.5, outline: 'none' }} />
+                </label>
+              </div>
+              <p style={{ fontFamily: bodyFont, fontSize: 10, color: COLORS.inkSoft, marginTop: 4 }}>Leave blank to control it only with the switch above. Set both dates and the banner will show itself automatically during that window, and hide itself after \u2014 no need to come back and turn it off.</p>
+            </div>
             <div className="rounded-2xl p-4 relative overflow-hidden mt-1" style={{ background: `linear-gradient(120deg, ${local.bannerColor1}, ${local.bannerColor2})` }}>
-              <p style={{ fontFamily: bodyFont, fontSize: 10, color: '#FBE3B0', fontWeight: 700, letterSpacing: 0.5 }}>PREVIEW</p>
-              <h2 style={{ fontFamily: displayFont, fontWeight: 700, fontStyle: 'italic', fontSize: 20, color: '#fff', marginTop: 4, lineHeight: 1.15 }}>{local.bannerTitle || 'Your Banner Title'}</h2>
-              <p style={{ fontFamily: bodyFont, fontSize: 12, color: '#fff', opacity: 0.9, marginTop: 2 }}>{local.bannerSubtitle || 'Your banner subtitle goes here'}</p>
-              <button className="mt-3 px-4 py-2 rounded-full" style={{ background: COLORS.card, color: COLORS.primaryDark, fontFamily: bodyFont, fontWeight: 700, fontSize: 12 }}>{local.bannerCta || 'Shop Now'}</button>
+              <FestiveSparkles count={6} />
+              <div className="relative" style={{ zIndex: 1 }}>
+                <p style={{ fontFamily: bodyFont, fontSize: 10, color: '#FBE3B0', fontWeight: 700, letterSpacing: 0.5 }}>PREVIEW</p>
+                <h2 style={{ fontFamily: displayFont, fontWeight: 700, fontStyle: 'italic', fontSize: 20, color: '#fff', marginTop: 4, lineHeight: 1.15 }}>{local.bannerTitle || 'Your Banner Title'}</h2>
+                <p style={{ fontFamily: bodyFont, fontSize: 12, color: '#fff', opacity: 0.9, marginTop: 2 }}>{local.bannerSubtitle || 'Your banner subtitle goes here'}</p>
+                <button className="mt-3 px-4 py-2 rounded-full" style={{ background: COLORS.card, color: COLORS.primaryDark, fontFamily: bodyFont, fontWeight: 700, fontSize: 12 }}>{local.bannerCta || 'Shop Now'}</button>
+              </div>
               <span className="absolute" style={{ right: -6, bottom: -14, fontSize: 64, opacity: 0.3 }}>{local.bannerEmoji || '\ud83c\udf89'}</span>
             </div>
           </div>
@@ -2152,10 +2266,10 @@ function AdminPage({ products, setProducts, orders, deliverySettings, setDeliver
 export default function App() {
   const [loaded, setLoaded] = useState(false);
   const [theme, setTheme] = useState('light');
-  applyTheme(theme); // mutate the shared COLORS object before this render's JSX reads it
+  const [deliverySettings, setDeliverySettings] = useState(SEED_DELIVERY);
+  applyTheme(theme, deliverySettings); // mutate the shared COLORS object before this render's JSX reads it
   const [products, setProducts] = useState(SEED_PRODUCTS);
   const [orders] = useState([]);
-  const [deliverySettings, setDeliverySettings] = useState(SEED_DELIVERY);
   const [cart, setCart] = useState({});
   const [route, setRoute] = useState({ page: 'home', params: {} });
   const [query, setQuery] = useState('');
@@ -2359,7 +2473,8 @@ export default function App() {
   const placeOrder = (data) => {
     const orderId = 'ORD' + String(Date.now()).slice(-6);
     const items = cartItems.map((i) => ({ id: i.id, name: i.name, price: i.price, qty: i.qty }));
-    const msg = `New order ${orderId} from ${data.name} (${data.mobile}).\nAddress: ${data.address}, ${data.pincode} (${data.area || ''}).\nItems:\n${items.map((i) => `- ${i.name} x${i.qty} = ${money(i.price * i.qty)}`).join('\n')}\nDelivery: ${data.deliveryCharge === 0 ? 'FREE' : money(data.deliveryCharge)}\nTotal: ${money(data.total)}\nPayment: ${paymentLabel(data.payment)}${data.paymentId ? ' (' + data.paymentId + ')' : ''}`;
+    const upiCheckNote = data.payment === 'upi' ? '\n\u26a0\ufe0f Please verify this payment has actually been received in your UPI/bank app before packing this order.' : '';
+    const msg = `New order ${orderId} from ${data.name} (${data.mobile}).\nAddress: ${data.address}, ${data.pincode} (${data.area || ''}).\nItems:\n${items.map((i) => `- ${i.name} x${i.qty} = ${money(i.price * i.qty)}`).join('\n')}\nDelivery: ${data.deliveryCharge === 0 ? 'FREE' : money(data.deliveryCharge)}\nTotal: ${money(data.total)}\nPayment: ${paymentLabel(data.payment)}${data.paymentId ? ' (Ref: ' + data.paymentId + ')' : ''}${upiCheckNote}`;
     const waLink = `https://wa.me/${deliverySettings.whatsappNumber}?text=${encodeURIComponent(msg)}`;
     if (BACKEND_ENABLED) {
       sbRpc('decrement_stock', { items: items.map((i) => ({ id: i.id, qty: i.qty })) }).catch((e) => console.error('Stock decrement failed to sync:', e));
