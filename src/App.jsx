@@ -5,7 +5,7 @@ import {
   Wind, Heart, Palette, Baby, Sun, Tag, Lock, Truck, CreditCard, Banknote,
   MessageCircle, Trash2, PlusCircle, BarChart3, Users,
   ClipboardList, AlertCircle, CheckCircle2, ArrowLeft,
-  LogOut, Flower, ShoppingBasket, Smartphone, ImagePlus, KeyRound, Moon, FileText, ShieldCheck, Share2
+  LogOut, Flower, ShoppingBasket, Smartphone, ImagePlus, KeyRound, Moon, FileText, ShieldCheck, Share2, MoreVertical
 } from 'lucide-react';
 
 if (typeof window !== 'undefined' && !window.storage) {
@@ -108,6 +108,43 @@ function applyTheme(mode, deliverySettings) {
 const displayFont = "'Fraunces', Georgia, serif";
 const bodyFont = "'Manrope', system-ui, sans-serif";
 const monoFont = "'Space Mono', monospace";
+
+/* -------------------------------- LANGUAGE ---------------------------------- */
+// Covers the core shopping flow (nav, search, cart, checkout, product actions) \u2014
+// not every screen in the app. Admin panel and legal pages stay in English.
+const TRANSLATIONS = {
+  en: {
+    home: 'Home', categories: 'Categories', wishlist: 'Wishlist', cart: 'Cart', admin: 'Admin',
+    search: 'Search products\u2026', setLocation: 'Set location', tagline: 'your neighbourhood, delivered',
+    addToCart: 'Add to Cart', buyNow: 'Buy Now', outOfStock: 'Out of Stock', inCart: 'in cart', alreadyInCart: 'already in cart',
+    yourCart: 'Your Cart', emptyCart: 'Your cart is empty', proceedToCheckout: 'Proceed to Checkout',
+    subtotal: 'Subtotal', deliveryCharge: 'Delivery charge', free: 'FREE', total: 'Total',
+    checkout: 'Checkout', fullName: 'Full Name', mobileNumber: 'Mobile Number', deliveryAddress: 'Delivery Address',
+    pincode: 'Pincode', placeOrder: 'Place Order', payViaUpi: 'Pay via UPI', writeReview: 'Write a Review',
+    addToWishlist: 'Add to Wishlist', maxInStock: 'Max in stock', onlyLeft: 'ONLY {n} LEFT', new: 'NEW', bestseller: 'BESTSELLER',
+    storeClosed: 'Store Closed', openingWhatsapp: 'Opening WhatsApp...',
+    enterName: 'Please enter your name.', enterMobile: 'Please enter a valid 10-digit mobile number.', enterAddress: 'Please enter your delivery address.',
+  },
+  hi: {
+    home: '\u0939\u094b\u092e', categories: '\u0936\u094d\u0930\u0947\u0923\u093f\u092f\u093e\u0902', wishlist: '\u0935\u093f\u0936\u0932\u093f\u0938\u094d\u091f', cart: '\u0915\u093e\u0930\u094d\u091f', admin: '\u090f\u0921\u092e\u093f\u0928',
+    search: '\u092a\u094d\u0930\u094b\u0921\u0915\u094d\u091f \u0916\u094b\u091c\u0947\u0902\u2026', setLocation: '\u0932\u094b\u0915\u0947\u0936\u0928 \u091a\u0941\u0928\u0947\u0902', tagline: '\u0906\u092a\u0915\u0947 \u092e\u094b\u0939\u0932\u094d\u0932\u0947 \u092e\u0947\u0902, \u0918\u0930 \u092a\u0939\u0941\u0902\u091a\u093e\u092f\u093e \u0917\u092f\u093e',
+    addToCart: '\u0915\u093e\u0930\u094d\u091f \u092e\u0947\u0902 \u0921\u093e\u0932\u0947\u0902', buyNow: '\u0905\u092d\u0940 \u0916\u0930\u0940\u0926\u0947\u0902', outOfStock: '\u0938\u094d\u091f\u0949\u0915 \u0916\u0924\u094d\u092e', inCart: '\u0915\u093e\u0930\u094d\u091f \u092e\u0947\u0902', alreadyInCart: '\u092a\u0939\u0932\u0947 \u0938\u0947 \u0915\u093e\u0930\u094d\u091f \u092e\u0947\u0902',
+    yourCart: '\u0906\u092a\u0915\u093e \u0915\u093e\u0930\u094d\u091f', emptyCart: '\u0906\u092a\u0915\u093e \u0915\u093e\u0930\u094d\u091f \u0916\u093e\u0932\u0940 \u0939\u0948', proceedToCheckout: '\u091a\u0947\u0915\u0906\u0909\u091f \u0915\u0930\u0947\u0902',
+    subtotal: '\u0938\u092c\u091f\u094b\u091f\u0932', deliveryCharge: '\u0921\u093f\u0932\u0940\u0935\u0930\u0940 \u0936\u0941\u0932\u094d\u0915', free: '\u092e\u0941\u092b\u094d\u0924', total: '\u0915\u0941\u0932',
+    checkout: '\u091a\u0947\u0915\u0906\u0909\u091f', fullName: '\u092a\u0942\u0930\u093e \u0928\u093e\u092e', mobileNumber: '\u092e\u094b\u092c\u093e\u0907\u0932 \u0928\u0902\u092c\u0930', deliveryAddress: '\u0921\u093f\u0932\u0940\u0935\u0930\u0940 \u092a\u0924\u093e',
+    pincode: '\u092a\u093f\u0928\u0915\u094b\u0921', placeOrder: '\u0911\u0930\u094d\u0921\u0930 \u0915\u0930\u0947\u0902', payViaUpi: 'UPI \u0938\u0947 \u092d\u0941\u0917\u0924\u093e\u0928 \u0915\u0930\u0947\u0902', writeReview: '\u0938\u092e\u0940\u0915\u094d\u0937\u093e \u0932\u093f\u0916\u0947\u0902',
+    addToWishlist: '\u0935\u093f\u0936\u0932\u093f\u0938\u094d\u091f \u092e\u0947\u0902 \u091c\u094b\u0921\u093c\u0947\u0902', maxInStock: '\u0938\u094d\u091f\u0949\u0915 \u092e\u0947\u0902 \u0905\u0927\u093f\u0915\u0924\u092e', onlyLeft: '\u0938\u093f\u0930\u094d\u092b {n} \u092c\u091a\u0947 \u0939\u0948\u0902', new: '\u0928\u092f\u093e', bestseller: '\u092c\u0947\u0938\u094d\u091f\u0938\u0947\u0932\u0930',
+    storeClosed: '\u0926\u0941\u0915\u093e\u0928 \u092c\u0902\u0926 \u0939\u0948', openingWhatsapp: '\u0935\u0949\u091f\u094d\u0938\u0910\u092a \u0916\u0941\u0932 \u0930\u0939\u093e \u0939\u0948...',
+    enterName: '\u0915\u0943\u092a\u092f\u093e \u0905\u092a\u0928\u093e \u0928\u093e\u092e \u0926\u0930\u094d\u091c \u0915\u0930\u0947\u0902\u0964', enterMobile: '\u0915\u0943\u092a\u092f\u093e \u0938\u0939\u0940 10-\u0905\u0902\u0915\u094b\u0902 \u0915\u093e \u092e\u094b\u092c\u093e\u0907\u0932 \u0928\u0902\u092c\u0930 \u0926\u0930\u094d\u091c \u0915\u0930\u0947\u0902\u0964', enterAddress: '\u0915\u0943\u092a\u092f\u093e \u0905\u092a\u0928\u093e \u0921\u093f\u0932\u0940\u0935\u0930\u0940 \u092a\u0924\u093e \u0926\u0930\u094d\u091c \u0915\u0930\u0947\u0902\u0964',
+  },
+};
+let currentLang = 'en';
+function setLang(lang) { currentLang = TRANSLATIONS[lang] ? lang : 'en'; }
+function t(key, vars) {
+  let str = (TRANSLATIONS[currentLang] && TRANSLATIONS[currentLang][key]) || TRANSLATIONS.en[key] || key;
+  if (vars) Object.entries(vars).forEach(([k, v]) => { str = str.replace(`{${k}}`, v); });
+  return str;
+}
 
 /* ------------------------------ BACKEND (Supabase) ------------------------------
    Fill these in once you've created a Supabase project and run schema.sql there.
@@ -532,7 +569,7 @@ function ProductCard({ product, onOpen, onAdd, qty, isWishlisted, onToggleWishli
           <span style={{ fontSize: 38 }}>{product.emoji}</span>
         )}
         <div className="absolute top-2 left-2 flex flex-col gap-1 items-start">
-          {product.isNew && <Badge bg={COLORS.secondary}>NEW</Badge>}
+          {product.isNew && <Badge bg={COLORS.secondary}>{t('new')}</Badge>}
           {product.stock > 0 && product.stock <= LOW_STOCK_THRESHOLD && <Badge bg={COLORS.gold} color={COLORS.ink}>ONLY {product.stock} LEFT</Badge>}
           {off > 0 && <Badge bg={COLORS.danger}>{off}% OFF</Badge>}
         </div>
@@ -602,8 +639,9 @@ function Rail({ products, onOpen, onAdd, cart, wishlist, onToggleWishlist }) {
 }
 
 /* --------------------------------- HEADER / NAV --------------------------------- */
-function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack, title, shopName, products = [], nav, categories = [], deliverySettings, theme, setTheme }) {
+function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack, title, shopName, products = [], nav, categories = [], deliverySettings, theme, setTheme, lang, setLang: setLangProp }) {
   const [focused, setFocused] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
   const shopOpen = deliverySettings ? isShopOpen(deliverySettings) : true;
 
   const suggestions = useMemo(() => {
@@ -637,10 +675,41 @@ function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack
           </div>
           <div>
             <h1 style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 18, color: COLORS.ink, lineHeight: 1 }}>{shopName}</h1>
-            <p style={{ fontFamily: bodyFont, fontSize: 10, color: COLORS.inkSoft }}>your neighbourhood, delivered</p>
+            <p style={{ fontFamily: bodyFont, fontSize: 10, color: COLORS.inkSoft }}>{t('tagline')}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2" style={{ position: 'relative' }}>
+          <button onClick={() => setShowMenu(!showMenu)} className="flex items-center justify-center rounded-full" style={{ width: 30, height: 30, background: COLORS.cream, border: `1px solid ${COLORS.border}` }}>
+            <MoreVertical size={15} color={COLORS.ink} />
+          </button>
+          {showMenu && (
+            <>
+              <div onClick={() => setShowMenu(false)} className="fixed inset-0" style={{ zIndex: 29 }} />
+              <div className="absolute right-0 rounded-xl overflow-hidden flex flex-col" style={{ top: 36, minWidth: 180, background: COLORS.card, border: `1px solid ${COLORS.border}`, boxShadow: '0 10px 24px rgba(43,32,19,0.12)', zIndex: 30 }}>
+                {setLangProp && (
+                  <div className="flex items-center justify-between px-4 py-2.5" style={{ borderBottom: `1px solid ${COLORS.border}` }}>
+                    <span style={{ fontFamily: bodyFont, fontSize: 12.5, fontWeight: 600, color: COLORS.ink }}>Language</span>
+                    <div className="flex rounded-full overflow-hidden" style={{ border: `1px solid ${COLORS.border}` }}>
+                      <button onClick={() => setLangProp('en')} className="px-2.5 py-1" style={{ background: lang === 'en' ? COLORS.primary : 'transparent', color: lang === 'en' ? '#fff' : COLORS.inkSoft, fontFamily: bodyFont, fontSize: 11, fontWeight: 700 }}>EN</button>
+                      <button onClick={() => setLangProp('hi')} className="px-2.5 py-1" style={{ background: lang === 'hi' ? COLORS.primary : 'transparent', color: lang === 'hi' ? '#fff' : COLORS.inkSoft, fontFamily: bodyFont, fontSize: 11, fontWeight: 700 }}>{'\u0939\u093f\u0902'}</button>
+                    </div>
+                  </div>
+                )}
+                {[
+                  { label: 'My Details', page: 'profile' },
+                  { label: 'My Orders', page: 'my-orders' },
+                  { label: 'About Us & Contact', page: 'about' },
+                  { label: 'FAQs', page: 'faq' },
+                  { label: 'Terms & Conditions', page: 'terms' },
+                  { label: 'Privacy Policy', page: 'privacy' },
+                ].map((item) => (
+                  <button key={item.page} onClick={() => { setShowMenu(false); nav(item.page); }} className="text-left px-4 py-2.5" style={{ borderBottom: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, fontWeight: 600, color: COLORS.ink }}>
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
           {setTheme && (
             <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="flex items-center justify-center rounded-full" style={{ width: 30, height: 30, background: COLORS.cream, border: `1px solid ${COLORS.border}` }}>
               {theme === 'dark' ? <Sun size={14} color={COLORS.gold} /> : <Moon size={14} color={COLORS.secondary} />}
@@ -648,7 +717,7 @@ function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack
           )}
           <button onClick={onChangeLocation} className="flex items-center gap-1 px-2.5 py-1.5 rounded-full" style={{ background: COLORS.cream, border: `1px solid ${COLORS.border}` }}>
             <MapPin size={13} color={COLORS.secondary} />
-            <span style={{ fontFamily: bodyFont, fontSize: 11, fontWeight: 700, color: COLORS.ink, maxWidth: 78, ...clamp1 }}>{area || 'Set location'}</span>
+            <span style={{ fontFamily: bodyFont, fontSize: 11, fontWeight: 700, color: COLORS.ink, maxWidth: 78, ...clamp1 }}>{area || t('setLocation')}</span>
             <ChevronDown size={12} color={COLORS.inkSoft} />
           </button>
         </div>
@@ -678,7 +747,7 @@ function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack
               onChange={(e) => setQuery(e.target.value)}
               onFocus={() => setFocused(true)}
               onBlur={() => setTimeout(() => setFocused(false), 150)}
-              placeholder="Search products..."
+              placeholder={t("search")}
               style={{ fontFamily: bodyFont, fontSize: 13.5, color: COLORS.ink, background: 'transparent', outline: 'none', width: '100%' }}
             />
             {query && (
@@ -743,11 +812,11 @@ function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack
 
 function BottomNav({ page, nav, cartCount }) {
   const items = [
-    { id: 'home', label: 'Home', Icon: Home },
-    { id: 'categories', label: 'Categories', Icon: LayoutGrid },
-    { id: 'wishlist', label: 'Wishlist', Icon: Heart },
-    { id: 'cart', label: 'Cart', Icon: ShoppingCart, badge: cartCount },
-    { id: 'admin', label: 'Admin', Icon: Lock },
+    { id: 'home', label: t('home'), Icon: Home },
+    { id: 'categories', label: t('categories'), Icon: LayoutGrid },
+    { id: 'wishlist', label: t('wishlist'), Icon: Heart },
+    { id: 'cart', label: t('cart'), Icon: ShoppingCart, badge: cartCount },
+    { id: 'admin', label: t('admin'), Icon: Lock },
   ];
   return (
     <div className="sticky bottom-0 z-30 flex items-stretch" style={{ background: COLORS.card, borderTop: `1px solid ${COLORS.border}` }}>
@@ -1004,9 +1073,9 @@ function ProductPage({ product, nav, onAdd, onBuyNow, qty, reviews = [], onAddRe
       </div>
       <div className="p-4">
         <div className="flex items-center gap-2 mb-2">
-          {product.isNew && <Badge bg={COLORS.secondary}>NEW</Badge>}
+          {product.isNew && <Badge bg={COLORS.secondary}>{t('new')}</Badge>}
           {off > 0 && <Badge bg={COLORS.danger}>{off}% OFF</Badge>}
-          {product.bestSeller && <Badge bg={COLORS.gold}>BESTSELLER</Badge>}
+          {product.bestSeller && <Badge bg={COLORS.gold}>{t('bestseller')}</Badge>}
         </div>
         <h1 style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 21, color: COLORS.ink }}>{product.name}</h1>
         <div className="flex items-center gap-1 mt-1.5">
@@ -1015,7 +1084,7 @@ function ProductPage({ product, nav, onAdd, onBuyNow, qty, reviews = [], onAddRe
             {displayRating} rating{productReviews.length > 0 ? ` \u00b7 ${productReviews.length} review${productReviews.length === 1 ? '' : 's'}` : ''}
           </span>
           <span style={{ color: COLORS.border }}>&bull;</span>
-          <span style={{ fontFamily: bodyFont, fontSize: 12.5, color: product.stock === 0 ? COLORS.danger : product.stock <= LOW_STOCK_THRESHOLD ? '#B8860B' : COLORS.secondary, fontWeight: 700 }}>
+          <span style={{ fontFamily: bodyFont, fontSize: 12.5, color: product.stock === 0 ? COLORS.danger : product.stock <= LOW_STOCK_THRESHOLD ? COLORS.gold : COLORS.secondary, fontWeight: 700 }}>
             {product.stock === 0 ? 'Out of stock' : product.stock <= LOW_STOCK_THRESHOLD ? `Only ${product.stock} left \u2014 order soon` : `${product.stock} in stock`}
           </span>
         </div>
@@ -1033,7 +1102,7 @@ function ProductPage({ product, nav, onAdd, onBuyNow, qty, reviews = [], onAddRe
             <span style={{ fontFamily: monoFont, fontSize: 13, minWidth: 16, textAlign: 'center' }}>{n}</span>
             <button onClick={() => setN(Math.min(product.stock || 1, n + 1))}><Plus size={14} color={COLORS.ink} /></button>
           </div>
-          {qty > 0 && <span style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.secondary, fontWeight: 700 }}>{qty} already in cart</span>}
+          {qty > 0 && <span style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.secondary, fontWeight: 700 }}>{qty} {t('alreadyInCart')}</span>}
         </div>
 
         <div className="mt-7">
@@ -1041,7 +1110,7 @@ function ProductPage({ product, nav, onAdd, onBuyNow, qty, reviews = [], onAddRe
             <h3 style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 14, color: COLORS.ink }}>Ratings &amp; Reviews</h3>
             {!showForm && (
               <button onClick={() => setShowForm(true)} style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12, color: COLORS.primary }}>
-                Write a Review
+                {t('writeReview')}
               </button>
             )}
           </div>
@@ -1097,7 +1166,7 @@ function ProductPage({ product, nav, onAdd, onBuyNow, qty, reviews = [], onAddRe
             className="flex-1 py-3 rounded-xl flex items-center justify-center gap-2"
             style={{ background: COLORS.cream, border: `2px solid ${COLORS.primary}`, color: COLORS.primaryDark, fontFamily: bodyFont, fontWeight: 700, fontSize: 13.5, opacity: product.stock === 0 ? 0.5 : 1 }}
           >
-            <ShoppingCart size={16} /> Add to Cart
+            <ShoppingCart size={16} /> {t('addToCart')}
           </button>
           <button
             onClick={() => onBuyNow(product, n)}
@@ -1105,7 +1174,7 @@ function ProductPage({ product, nav, onAdd, onBuyNow, qty, reviews = [], onAddRe
             className="flex-1 py-3 rounded-xl"
             style={{ background: product.stock === 0 ? COLORS.border : COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 13.5, boxShadow: product.stock === 0 ? 'none' : '0 4px 10px rgba(217,115,13,0.35)' }}
           >
-            Buy Now
+            {t('buyNow')}
           </button>
         </div>
       </div>
@@ -1118,7 +1187,7 @@ function CartPage({ cartItems, updateQty, removeItem, subtotal, nav }) {
     return (
       <div className="flex flex-col items-center py-20 gap-3 px-6">
         <ShoppingCart size={40} color={COLORS.inkSoft} />
-        <p style={{ fontFamily: bodyFont, color: COLORS.ink, fontWeight: 700, fontSize: 14 }}>Your cart is empty</p>
+        <p style={{ fontFamily: bodyFont, color: COLORS.ink, fontWeight: 700, fontSize: 14 }}>{t('emptyCart')}</p>
         <p style={{ fontFamily: bodyFont, color: COLORS.inkSoft, fontSize: 12, textAlign: 'center' }}>Explore our categories and add items you love.</p>
         <button onClick={() => nav('categories')} className="px-5 py-2.5 rounded-full mt-1" style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>Browse Categories</button>
       </div>
@@ -1142,7 +1211,7 @@ function CartPage({ cartItems, updateQty, removeItem, subtotal, nav }) {
                   <button onClick={() => updateQty(item.id, item.qty + 1)} disabled={item.qty >= (item.stock ?? Infinity)} style={{ opacity: item.qty >= (item.stock ?? Infinity) ? 0.35 : 1 }}><Plus size={12} /></button>
                 </div>
                 {item.qty >= (item.stock ?? Infinity) && (
-                  <span style={{ fontFamily: bodyFont, fontSize: 10, color: COLORS.inkSoft }}>Max in stock</span>
+                  <span style={{ fontFamily: bodyFont, fontSize: 10, color: COLORS.inkSoft }}>{t('maxInStock')}</span>
                 )}
                 <button onClick={() => removeItem(item.id)}><Trash2 size={14} color={COLORS.danger} /></button>
               </div>
@@ -1154,10 +1223,10 @@ function CartPage({ cartItems, updateQty, removeItem, subtotal, nav }) {
       <div className="fixed left-0 right-0 flex justify-center z-40" style={{ bottom: 58 }}>
         <div className="w-full p-4 rounded-t-2xl" style={{ background: COLORS.card, borderTop: `1px solid ${COLORS.border}`, maxWidth: 448, boxShadow: '0 -6px 18px rgba(43,32,19,0.10)' }}>
           <div className="flex items-center justify-between mb-3">
-            <span style={{ fontFamily: bodyFont, fontSize: 13, color: COLORS.inkSoft }}>Subtotal</span>
+            <span style={{ fontFamily: bodyFont, fontSize: 13, color: COLORS.inkSoft }}>{t('subtotal')}</span>
             <span style={{ fontFamily: monoFont, fontSize: 16, fontWeight: 700, color: COLORS.ink }}>{money(subtotal)}</span>
           </div>
-          <button onClick={() => nav('checkout')} className="w-full py-3.5 rounded-xl" style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 14, boxShadow: '0 4px 10px rgba(217,115,13,0.35)' }}>Proceed to Checkout</button>
+          <button onClick={() => nav('checkout')} className="w-full py-3.5 rounded-xl" style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 14, boxShadow: '0 4px 10px rgba(217,115,13,0.35)' }}>{t('proceedToCheckout')}</button>
         </div>
       </div>
     </div>
@@ -1197,9 +1266,9 @@ function CheckoutPage({ cartItems, subtotal, deliverySettings, nav, placeOrder }
   const submit = async () => {
     setError('');
     if (shopClosed) return setError(`We're currently closed. We reopen at ${formatTime12(deliverySettings.openTime)}.`);
-    if (!form.name.trim()) return setError('Please enter your name.');
-    if (!/^\d{10}$/.test(form.mobile)) return setError('Please enter a valid 10-digit mobile number.');
-    if (!form.address.trim()) return setError('Please enter your delivery address.');
+    if (!form.name.trim()) return setError(t('enterName'));
+    if (!/^\d{10}$/.test(form.mobile)) return setError(t('enterMobile'));
+    if (!form.address.trim()) return setError(t('enterAddress'));
     if (!zone || !zone.allowed) return setError("Sorry, we currently don't deliver to this location.");
     if (belowMin) return setError(`Minimum order value is ${money(deliverySettings.minOrderValue)}.`);
 
@@ -1313,10 +1382,10 @@ function CheckoutPage({ cartItems, subtotal, deliverySettings, nav, placeOrder }
       )}
       <h2 style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 13, color: COLORS.ink, marginBottom: 8 }}>Delivery Details</h2>
       <div className="flex flex-col gap-2.5">
-        <input value={form.name} onChange={set('name')} placeholder="Customer name" className="px-4 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none' }} />
-        <input value={form.mobile} onChange={(e) => setForm({ ...form, mobile: e.target.value.replace(/\D/g, '').slice(0, 10) })} placeholder="Mobile number" className="px-4 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 13, outline: 'none' }} />
-        <textarea value={form.address} onChange={set('address')} placeholder="Delivery address (house no, street, landmark)" rows={3} className="px-4 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none', resize: 'none' }} />
-        <input value={form.pincode} onChange={(e) => setForm({ ...form, pincode: e.target.value.replace(/\D/g, '').slice(0, 6) })} placeholder="Pincode" className="px-4 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 13, outline: 'none' }} />
+        <input value={form.name} onChange={set('name')} placeholder={t("fullName")} className="px-4 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none' }} />
+        <input value={form.mobile} onChange={(e) => setForm({ ...form, mobile: e.target.value.replace(/\D/g, '').slice(0, 10) })} placeholder={t("mobileNumber")} className="px-4 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 13, outline: 'none' }} />
+        <textarea value={form.address} onChange={set('address')} placeholder={t("deliveryAddress")} rows={3} className="px-4 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none', resize: 'none' }} />
+        <input value={form.pincode} onChange={(e) => setForm({ ...form, pincode: e.target.value.replace(/\D/g, '').slice(0, 6) })} placeholder={t("pincode")} className="px-4 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 13, outline: 'none' }} />
 
         {zone && zone.allowed && (
           <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ background: COLORS.successTint }}>
@@ -1354,12 +1423,12 @@ function CheckoutPage({ cartItems, subtotal, deliverySettings, nav, placeOrder }
       </div>
 
       <div className="mt-5 rounded-2xl p-4" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
-        <div className="flex justify-between mb-1.5"><span style={{ fontFamily: bodyFont, fontSize: 12.5, color: COLORS.inkSoft }}>Subtotal</span><span style={{ fontFamily: monoFont, fontSize: 12.5, color: COLORS.ink }}>{money(subtotal)}</span></div>
-        <div className="flex justify-between mb-1.5"><span style={{ fontFamily: bodyFont, fontSize: 12.5, color: COLORS.inkSoft }}>Delivery charge</span><span style={{ fontFamily: monoFont, fontSize: 12.5, color: deliveryCharge === 0 ? COLORS.secondary : COLORS.ink }}>{deliveryCharge === 0 ? 'FREE' : money(deliveryCharge)}</span></div>
+        <div className="flex justify-between mb-1.5"><span style={{ fontFamily: bodyFont, fontSize: 12.5, color: COLORS.inkSoft }}>{t('subtotal')}</span><span style={{ fontFamily: monoFont, fontSize: 12.5, color: COLORS.ink }}>{money(subtotal)}</span></div>
+        <div className="flex justify-between mb-1.5"><span style={{ fontFamily: bodyFont, fontSize: 12.5, color: COLORS.inkSoft }}>{t('deliveryCharge')}</span><span style={{ fontFamily: monoFont, fontSize: 12.5, color: deliveryCharge === 0 ? COLORS.secondary : COLORS.ink }}>{deliveryCharge === 0 ? t('free') : money(deliveryCharge)}</span></div>
         {belowMin && <p style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.danger, marginBottom: 6 }}>Minimum order value is {money(deliverySettings.minOrderValue)}. Add {money(deliverySettings.minOrderValue - subtotal)} more.</p>}
         {!belowMin && deliveryCharge > 0 && <p style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft, marginBottom: 6 }}>Add {money(deliverySettings.freeDeliveryThreshold - subtotal)} more for free delivery.</p>}
         <div className="flex justify-between pt-2" style={{ borderTop: `1px dashed ${COLORS.border}` }}>
-          <span style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 13.5, color: COLORS.ink }}>Total Amount</span>
+          <span style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 13.5, color: COLORS.ink }}>{t('total')} Amount</span>
           <span style={{ fontFamily: monoFont, fontWeight: 700, fontSize: 15, color: COLORS.ink }}>{money(total)}</span>
         </div>
       </div>
@@ -1374,7 +1443,7 @@ function CheckoutPage({ cartItems, subtotal, deliverySettings, nav, placeOrder }
       <div className="fixed left-0 right-0 flex justify-center z-40" style={{ bottom: 58 }}>
         <div className="w-full p-4" style={{ background: COLORS.card, borderTop: `1px solid ${COLORS.border}`, maxWidth: 448, boxShadow: '0 -6px 18px rgba(43,32,19,0.10)' }}>
           <button onClick={submit} disabled={paying || shopClosed} className="w-full py-3.5 rounded-xl" style={{ background: paying || shopClosed ? COLORS.border : COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 14, boxShadow: paying || shopClosed ? 'none' : '0 4px 10px rgba(217,115,13,0.35)' }}>
-            {shopClosed ? 'Store Closed' : paying ? 'Opening WhatsApp...' : payment === 'online' && RAZORPAY_ENABLED ? `Pay ${money(total)} Now` : payment === 'upi' ? `Pay ${money(total)} via UPI` : `Place Order \u00b7 ${money(total)}`}
+            {shopClosed ? t('storeClosed') : paying ? t('openingWhatsapp') : payment === 'online' && RAZORPAY_ENABLED ? `Pay ${money(total)} Now` : payment === 'upi' ? `${t('payViaUpi')} \u00b7 ${money(total)}` : `${t('placeOrder')} \u00b7 ${money(total)}`}
           </button>
           <p style={{ fontFamily: bodyFont, fontSize: 10, color: COLORS.inkSoft, textAlign: 'center', marginTop: 8, lineHeight: 1.4 }}>
             By placing this order, you agree to our{' '}
@@ -1646,19 +1715,19 @@ function ProfilePage() {
       </p>
 
       <label className="flex flex-col gap-1.5">
-        <span style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.inkSoft, fontWeight: 700 }}>Full Name</span>
+        <span style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.inkSoft, fontWeight: 700 }}>{t('fullName')}</span>
         <input value={form.name} onChange={set('name')} placeholder="Your name" className="px-3.5 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none' }} />
       </label>
       <label className="flex flex-col gap-1.5">
-        <span style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.inkSoft, fontWeight: 700 }}>Mobile Number</span>
+        <span style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.inkSoft, fontWeight: 700 }}>{t('mobileNumber')}</span>
         <input value={form.mobile} onChange={set('mobile')} placeholder="10-digit mobile number" className="px-3.5 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 13, outline: 'none' }} />
       </label>
       <label className="flex flex-col gap-1.5">
-        <span style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.inkSoft, fontWeight: 700 }}>Delivery Address</span>
+        <span style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.inkSoft, fontWeight: 700 }}>{t('deliveryAddress')}</span>
         <textarea value={form.address} onChange={set('address')} placeholder="House no., street, landmark" rows={3} className="px-3.5 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none', resize: 'none' }} />
       </label>
       <label className="flex flex-col gap-1.5">
-        <span style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.inkSoft, fontWeight: 700 }}>Pincode</span>
+        <span style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.inkSoft, fontWeight: 700 }}>{t('pincode')}</span>
         <input value={form.pincode} onChange={set('pincode')} placeholder="6-digit pincode" maxLength={6} className="px-3.5 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 13, outline: 'none' }} />
       </label>
 
@@ -1924,7 +1993,12 @@ function AdminTabs({ tab, setTab }) {
 
 function InvoiceOverlay({ order, deliverySettings, onClose }) {
   const gst = deliverySettings.gstNumber;
-  const isStandalone = typeof window !== 'undefined' && (window.navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches));
+  // navigator.standalone is a legacy Apple-only flag that is true ONLY for an
+  // installed iOS home-screen web app \u2014 it's undefined everywhere else,
+  // including Android's own installed/standalone mode, where printing still
+  // works fine. So this deliberately does NOT use a general "is this running
+  // standalone" check, which would incorrectly hide Print on Android too.
+  const isIOSStandalone = typeof window !== 'undefined' && window.navigator.standalone === true;
 
   const shareInvoiceText = async () => {
     const lines = [
@@ -1957,7 +2031,7 @@ function InvoiceOverlay({ order, deliverySettings, onClose }) {
         <div className="flex items-center justify-between px-4 py-3 no-print" style={{ borderBottom: '1px solid #eee', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
           <span style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 14, color: '#1a1a1a' }}>Invoice</span>
           <div className="flex gap-2">
-            {isStandalone ? (
+            {isIOSStandalone ? (
               <button onClick={shareInvoiceText} className="px-3 py-1.5 rounded-full" style={{ background: '#1a1a1a', color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 11.5 }}>Share Invoice</button>
             ) : (
               <button onClick={() => window.print()} className="px-3 py-1.5 rounded-full" style={{ background: '#1a1a1a', color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 11.5 }}>Print / Save PDF</button>
@@ -1965,7 +2039,7 @@ function InvoiceOverlay({ order, deliverySettings, onClose }) {
             <button onClick={onClose} className="px-3 py-1.5 rounded-full" style={{ border: '1px solid #ddd', fontFamily: bodyFont, fontWeight: 700, fontSize: 11.5, color: '#1a1a1a' }}>Close</button>
           </div>
         </div>
-        {isStandalone && (
+        {isIOSStandalone && (
           <p className="no-print" style={{ fontFamily: bodyFont, fontSize: 10.5, color: '#888', padding: '0 16px', marginTop: 8, lineHeight: 1.5 }}>
             Printing/saving as PDF isn&apos;t available inside the installed app on iPhone \u2014 that&apos;s an Apple limitation, not a bug. Open this site in Safari (not the Home Screen icon) to print or save as PDF, or use Share Invoice above to send it as text.
           </p>
@@ -2368,7 +2442,7 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
                     <input type="text" value={p.mrp} onChange={(e) => update(p.id, { mrp: Number(e.target.value.replace(/\D/g, '')) || 0 })} className="w-16 px-1.5 py-1 rounded" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 11 }} />
                   </label>
                   <label className="flex items-center gap-1"><span style={{ fontSize: 10, color: COLORS.inkSoft, fontFamily: bodyFont }}>Stock</span>
-                    <input type="text" value={p.stock} onChange={(e) => update(p.id, { stock: Number(e.target.value.replace(/\D/g, '')) || 0 })} className="w-14 px-1.5 py-1 rounded" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${p.stock === 0 ? COLORS.danger : p.stock <= LOW_STOCK_THRESHOLD ? '#B8860B' : COLORS.border}`, fontFamily: monoFont, fontSize: 11 }} />
+                    <input type="text" value={p.stock} onChange={(e) => update(p.id, { stock: Number(e.target.value.replace(/\D/g, '')) || 0 })} className="w-14 px-1.5 py-1 rounded" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${p.stock === 0 ? COLORS.danger : p.stock <= LOW_STOCK_THRESHOLD ? COLORS.gold : COLORS.border}`, fontFamily: monoFont, fontSize: 11 }} />
                   </label>
                   {p.stock === 0 && <Badge bg={COLORS.danger}>OUT OF STOCK</Badge>}
                   {p.stock > 0 && p.stock <= LOW_STOCK_THRESHOLD && <Badge bg={COLORS.gold} color={COLORS.ink}>LOW STOCK</Badge>}
@@ -2702,6 +2776,8 @@ function AdminPage({ products, setProducts, salesLog, refreshSalesLog, onViewInv
 export default function App() {
   const [loaded, setLoaded] = useState(false);
   const [theme, setTheme] = useState('light');
+  const [lang, setLangState] = useState('en');
+  setLang(lang); // mutate the shared currentLang before this render's JSX reads it via t()
   const [deliverySettings, setDeliverySettings] = useState(SEED_DELIVERY);
   applyTheme(theme, deliverySettings); // mutate the shared COLORS object before this render's JSX reads it
   const [products, setProducts] = useState([]);
@@ -2748,14 +2824,16 @@ export default function App() {
           window.storage.get('mm-custom-categories'),
           window.storage.get('mm-theme'),
           window.storage.get('mm-wishlist'),
+          window.storage.get('mm-lang'),
         ]);
-        const [c, loc, pw, cc, th, wl] = results.map((r) => (r.status === 'fulfilled' ? r.value : null));
+        const [c, loc, pw, cc, th, wl, lg] = results.map((r) => (r.status === 'fulfilled' ? r.value : null));
         if (c && c.value) setCart(JSON.parse(c.value));
         if (loc && loc.value) { setDeliveryArea(loc.value); setShowLocationModal(false); }
         if (pw && pw.value) setAdminPassword(pw.value);
         if (cc && cc.value) setCustomCategories(JSON.parse(cc.value));
         if (th && th.value) setTheme(th.value);
         if (wl && wl.value) setWishlist(JSON.parse(wl.value));
+        if (lg && lg.value) setLangState(lg.value);
       } catch (e) { /* keep defaults */ }
 
       if (BACKEND_ENABLED) {
@@ -2837,6 +2915,7 @@ export default function App() {
   }, [adminPassword, loaded]);
   useEffect(() => { if (loaded) window.storage.set('mm-custom-categories', JSON.stringify(customCategories)).catch(() => {}); }, [customCategories, loaded]);
   useEffect(() => { if (loaded) window.storage.set('mm-theme', theme).catch(() => {}); }, [theme, loaded]);
+  useEffect(() => { if (loaded) window.storage.set('mm-lang', lang).catch(() => {}); }, [lang, loaded]);
   useEffect(() => {
     if (!BACKEND_ENABLED || !isAdmin) return;
     const interval = setInterval(async () => {
@@ -2971,7 +3050,7 @@ export default function App() {
   const headerTitleMap = {
     category: allCategories.find((c) => c.id === route.params.id)?.name,
     product: currentProduct?.name,
-    checkout: 'Checkout',
+    checkout: t('checkout'),
     list: listTitle,
     about: 'About Us & Contact',
     terms: 'Terms & Conditions',
@@ -3009,7 +3088,7 @@ export default function App() {
           showBackHeader ? (
             <Header title={headerTitleMap[route.page] || ''} onBack={() => nav(route.page === 'product' ? 'home' : 'home')} />
           ) : (
-            <Header query={query} setQuery={setQuery} onSearch={runSearch} area={deliveryArea} onChangeLocation={() => setShowLocationModal(true)} shopName={deliverySettings.shopName} products={products} nav={nav} categories={allRealCategories} deliverySettings={deliverySettings} theme={theme} setTheme={setTheme} />
+            <Header query={query} setQuery={setQuery} onSearch={runSearch} area={deliveryArea} onChangeLocation={() => setShowLocationModal(true)} shopName={deliverySettings.shopName} products={products} nav={nav} categories={allRealCategories} deliverySettings={deliverySettings} theme={theme} setTheme={setTheme} lang={lang} setLang={setLangState} />
           )
         )}
 
