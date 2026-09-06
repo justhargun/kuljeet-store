@@ -391,46 +391,6 @@ const GRADIENTS = [
   ['#E3EAD1', '#C3D69E'], ['#F0E0CE', '#DDBB8D'],
 ];
 const grad = (i) => GRADIENTS[i % GRADIENTS.length];
-
-/* -------------------------------- PRODUCTS ---------------------------------- */
-const RAW_PRODUCTS = [
-  ['cosmetics', 'Rosewater Face Mist 120ml', 199, 249, 42, '\ud83c\udf39', 4.4, { bestSeller: true }],
-  ['cosmetics', 'Charcoal Peel-Off Mask 90g', 249, 299, 30, '\ud83e\uddf4', 4.2, { deal: true }],
-  ['skincare', 'Aloe Vera Soothing Gel 150ml', 149, 179, 60, '\ud83c\udf3f', 4.5, { bestSeller: true }],
-  ['skincare', 'Vitamin C Brightening Serum 30ml', 399, 599, 18, '\u2728', 4.6, { deal: true, isNew: true }],
-  ['skincare', 'Daily Sunscreen SPF50 50ml', 329, 399, 25, '\u2600\ufe0f', 4.5, { bestSeller: true }],
-  ['haircare', 'Argan Hair Oil 200ml', 259, 320, 34, '\ud83e\udee4', 4.3, {}],
-  ['haircare', 'Onion Hair Shampoo 340ml', 289, 349, 50, '\ud83e\uddb4', 4.4, { bestSeller: true, isNew: true }],
-  ['haircare', 'Herbal Hair Mask 200g', 219, 260, 20, '\ud83d\udc41\ufe0f', 4.1, {}],
-  ['personalcare', 'Herbal Handwash 250ml (Pack of 2)', 159, 199, 45, '\ud83e\uddfc', 4.3, {}],
-  ['personalcare', 'Deo Roll-On for Men 50ml', 149, 179, 38, '\ud83d\udca8', 4.0, {}],
-  ['perfumes', 'Oudh Attar Perfume 20ml', 349, 499, 15, '\ud83c\udf38', 4.6, { deal: true }],
-  ['perfumes', 'Citrus Splash EDT 100ml', 599, 799, 12, '\ud83c\udf4b', 4.2, {}],
-  ['makeup', 'Matte Liquid Lipstick', 249, 349, 40, '\ud83d\udc84', 4.5, { bestSeller: true }],
-  ['makeup', 'Compact Powder Duo', 199, 249, 28, '\ud83c\udfa8', 4.1, { deal: true }],
-  ['makeup', 'Kajal Twin Pack', 99, 129, 55, '\ud83d\udc41\ufe0f', 4.3, {}],
-  ['bath', 'Sandalwood Bathing Bar (Pack of 4)', 149, 179, 70, '\ud83e\uddfd', 4.4, { isNew: true }],
-  ['bath', 'Body Wash Lavender 300ml', 219, 259, 33, '\ud83d\udebf', 4.2, {}],
-  ['baby', 'Baby Massage Oil 200ml', 189, 229, 24, '\ud83c\udf7c', 4.5, {}],
-  ['baby', 'Baby Wet Wipes (80 pcs)', 129, 149, 65, '\ud83d\udc76', 4.6, { bestSeller: true }],
-  ['household', 'Multi-Surface Cleaner 500ml', 129, 159, 40, '\ud83e\uddf9', 4.1, {}],
-  ['household', 'Dishwash Bar (Pack of 3)', 45, 55, 90, '\ud83c\udf7d\ufe0f', 4.0, {}],
-  ['general', 'Steel Lunch Box 3-Compartment', 349, 449, 16, '\ud83c\udf71', 4.3, {}],
-  ['general', 'Cotton Bath Towel', 299, 399, 20, '\ud83e\uddfa', 4.2, {}],
-  ['essentials', 'Refined Sunflower Oil 1L', 149, 169, 48, '\ud83e\uded9', 4.2, { bestSeller: true }],
-  ['essentials', 'Basmati Rice 1kg', 129, 149, 55, '\ud83c\udf5a', 4.4, {}],
-  ['essentials', 'Toor Dal 1kg', 139, 159, 44, '\ud83c\udf3e', 4.3, {}],
-];
-const SEED_PRODUCTS = RAW_PRODUCTS.map((r, i) => {
-  const [category, name, price, mrp, stock, emoji, rating, flags] = r;
-  const [g1, g2] = grad(i);
-  return {
-    id: 'p' + (i + 1), category, name, price, mrp, stock, emoji, rating, g1, g2,
-    bestSeller: !!flags.bestSeller, isNew: !!flags.isNew, deal: !!flags.deal,
-    desc: 'A trusted everyday pick from our store shelves, sourced fresh and stocked for quick home delivery in your neighbourhood.',
-  };
-});
-
 /* ---------------------------------- DELIVERY -------------------------------- */
 const SEED_DELIVERY = {
   shopName: 'Kuljeet Store',
@@ -1964,16 +1924,52 @@ function AdminTabs({ tab, setTab }) {
 
 function InvoiceOverlay({ order, deliverySettings, onClose }) {
   const gst = deliverySettings.gstNumber;
+  const isStandalone = typeof window !== 'undefined' && (window.navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches));
+
+  const shareInvoiceText = async () => {
+    const lines = [
+      `Invoice \u2014 ${deliverySettings.shopName}`,
+      `Order ${order.id}`,
+      new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
+      '',
+      `Billed to: ${order.name}`,
+      `${order.address}, ${order.pincode}`,
+      order.mobile,
+      '',
+      ...order.items.map((it) => `${it.name} x${it.qty} = ${money(it.price * it.qty)}`),
+      '',
+      `Subtotal: ${money(order.subtotal)}`,
+      `Delivery: ${order.deliveryCharge === 0 ? 'FREE' : money(order.deliveryCharge)}`,
+      `Total: ${money(order.total)}`,
+      `Payment: ${paymentLabel(order.payment)}${order.paymentRef ? ` (Ref: ${order.paymentRef})` : ''}`,
+    ];
+    const text = lines.join('\n');
+    if (navigator.share) {
+      try { await navigator.share({ title: `Invoice ${order.id}`, text }); } catch (e) { /* cancelled */ }
+    } else if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).catch(() => {});
+    }
+  };
+
   return (
     <div className="fixed inset-0 flex justify-center" style={{ background: 'rgba(0,0,0,0.4)', zIndex: 9999 }}>
       <div className="w-full flex flex-col" style={{ maxWidth: 448, maxHeight: '100vh', overflowY: 'auto', background: '#fff' }}>
         <div className="flex items-center justify-between px-4 py-3 no-print" style={{ borderBottom: '1px solid #eee', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
           <span style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 14, color: '#1a1a1a' }}>Invoice</span>
           <div className="flex gap-2">
-            <button onClick={() => window.print()} className="px-3 py-1.5 rounded-full" style={{ background: '#1a1a1a', color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 11.5 }}>Print / Save PDF</button>
+            {isStandalone ? (
+              <button onClick={shareInvoiceText} className="px-3 py-1.5 rounded-full" style={{ background: '#1a1a1a', color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 11.5 }}>Share Invoice</button>
+            ) : (
+              <button onClick={() => window.print()} className="px-3 py-1.5 rounded-full" style={{ background: '#1a1a1a', color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 11.5 }}>Print / Save PDF</button>
+            )}
             <button onClick={onClose} className="px-3 py-1.5 rounded-full" style={{ border: '1px solid #ddd', fontFamily: bodyFont, fontWeight: 700, fontSize: 11.5, color: '#1a1a1a' }}>Close</button>
           </div>
         </div>
+        {isStandalone && (
+          <p className="no-print" style={{ fontFamily: bodyFont, fontSize: 10.5, color: '#888', padding: '0 16px', marginTop: 8, lineHeight: 1.5 }}>
+            Printing/saving as PDF isn&apos;t available inside the installed app on iPhone \u2014 that&apos;s an Apple limitation, not a bug. Open this site in Safari (not the Home Screen icon) to print or save as PDF, or use Share Invoice above to send it as text.
+          </p>
+        )}
 
         <div className="p-6" style={{ color: '#1a1a1a' }}>
           <div className="flex justify-between items-start mb-6">
@@ -2708,7 +2704,7 @@ export default function App() {
   const [theme, setTheme] = useState('light');
   const [deliverySettings, setDeliverySettings] = useState(SEED_DELIVERY);
   applyTheme(theme, deliverySettings); // mutate the shared COLORS object before this render's JSX reads it
-  const [products, setProducts] = useState(SEED_PRODUCTS);
+  const [products, setProducts] = useState([]);
   const [salesLog, setSalesLog] = useState([]);
   const [viewInvoice, setViewInvoice] = useState(null);
   const [cart, setCart] = useState({});
@@ -2788,27 +2784,8 @@ export default function App() {
           } catch (e) {
             console.error('Could not load reviews (has fix-reviews.sql been run yet?):', e);
           }
-          const alreadySeeded = !!(settingsRows && settingsRows[0] && settingsRows[0].products_seeded);
-          if (prodRows && prodRows.length) {
+          if (prodRows) {
             setProducts(prodRows.map(mapProductFromDb));
-          } else if (!alreadySeeded) {
-            // First-time setup only: Supabase has no products yet and we've never
-            // seeded before, so push the built-in demo catalog into it once, and use
-            // the real database rows (with real UUIDs) from then on. If the shop
-            // owner later deletes all products on purpose, this will NOT run again.
-            try {
-              const seedRows = await sbInsert('products', SEED_PRODUCTS.map((p) => ({
-                category: p.category, name: p.name, price: p.price, mrp: p.mrp, stock: p.stock,
-                emoji: p.emoji, g1: p.g1, g2: p.g2, rating: p.rating, best_seller: p.bestSeller,
-                is_new: p.isNew, deal: p.deal, description: p.desc, image_url: p.imageUrl || null,
-              })));
-              setProducts(seedRows.map(mapProductFromDb));
-              sbUpdate('delivery_settings', 'id=eq.1', { products_seeded: true }).catch((e) => console.error('Could not mark products as seeded:', e));
-            } catch (e) {
-              console.error('Could not seed Supabase with demo products, showing local demo data instead:', e);
-            }
-          } else {
-            setProducts([]);
           }
           if (settingsRows && settingsRows[0]) {
             const mapped = mapDeliveryFromDb(settingsRows[0], pinRows || []);
