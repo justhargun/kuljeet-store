@@ -5,7 +5,7 @@ import {
   Wind, Heart, Palette, Baby, Sun, Tag, Lock, Truck, CreditCard, Banknote,
   MessageCircle, Trash2, PlusCircle, BarChart3, Users,
   ClipboardList, AlertCircle, CheckCircle2, ArrowLeft,
-  LogOut, Flower, ShoppingBasket, Smartphone, ImagePlus, KeyRound, Moon, FileText, ShieldCheck
+  LogOut, Flower, ShoppingBasket, Smartphone, ImagePlus, KeyRound, Moon, FileText, ShieldCheck, Share2
 } from 'lucide-react';
 
 if (typeof window !== 'undefined' && !window.storage) {
@@ -276,6 +276,54 @@ function mapProductFromDb(r) {
 function mapReviewFromDb(r) {
   return { id: r.id, productId: r.product_id, name: r.customer_name, rating: Number(r.rating), comment: r.comment || '', createdAt: r.created_at ? new Date(r.created_at).getTime() : Date.now() };
 }
+function mapSalesLogFromDb(r) {
+  return {
+    id: r.id, name: r.customer_name || '', mobile: r.customer_mobile || '', address: r.customer_address || '', pincode: r.customer_pincode || '',
+    items: Array.isArray(r.items) ? r.items : [], subtotal: Number(r.subtotal) || 0, deliveryCharge: Number(r.delivery_charge) || 0, total: Number(r.total) || 0,
+    payment: r.payment || '', paymentRef: r.payment_ref || '', createdAt: r.created_at ? new Date(r.created_at).getTime() : Date.now(),
+  };
+}
+function parseCSV(text) {
+  const rows = [];
+  let row = [], field = '', inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; }
+        else inQuotes = false;
+      } else field += c;
+    } else if (c === '"') {
+      inQuotes = true;
+    } else if (c === ',') {
+      row.push(field); field = '';
+    } else if (c === '\n' || c === '\r') {
+      if (c === '\r' && text[i + 1] === '\n') i++;
+      row.push(field); field = '';
+      if (row.length > 1 || row[0] !== '') rows.push(row);
+      row = [];
+    } else {
+      field += c;
+    }
+  }
+  if (field !== '' || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+function toCSVField(v) {
+  const s = String(v == null ? '' : v);
+  if (/[",\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+function toCSV(headers, rows) {
+  return [headers.join(','), ...rows.map((r) => headers.map((h) => toCSVField(r[h])).join(','))].join('\n');
+}
+function downloadTextFile(filename, text, mime) {
+  const blob = new Blob([text], { type: mime || 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
 function readImageAsDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -286,7 +334,7 @@ function readImageAsDataUrl(file) {
 }
 function mapDeliveryFromDb(row, pinRows) {
   return {
-    shopName: row.shop_name, shopArea: row.shop_area, shopPincode: row.shop_pincode, mode: row.mode,
+    shopName: row.shop_name, shopArea: row.shop_area, shopPincode: row.shop_pincode, mode: row.mode, gstNumber: row.gst_number || '',
     radiusKm: Number(row.radius_km), minOrderValue: Number(row.min_order_value), deliveryCharge: Number(row.delivery_charge),
     freeDeliveryThreshold: Number(row.free_delivery_threshold), whatsappNumber: row.whatsapp_number,
     upiId: row.upi_id || '',
@@ -388,6 +436,7 @@ const SEED_DELIVERY = {
   shopName: 'Kuljeet Store',
   shopArea: 'Hargaon, Sitapur',
   shopPincode: '261121',
+  gstNumber: '',
   mode: 'radius',
   pincodes: [
     { pincode: '201301', area: 'Sector 62, Noida' },
@@ -454,7 +503,6 @@ function isShopOpen(settings) {
   return nowMins >= openMins || nowMins < closeMins; // handles overnight hours, e.g. 18:00-02:00
 }
 
-const STATUS_STEPS = ['Order Received', 'Confirmed', 'Packing', 'Out for Delivery', 'Delivered'];
 const LOW_STOCK_THRESHOLD = 5;
 
 /* -------------------------------- SMALL PARTS -------------------------------- */
@@ -978,6 +1026,21 @@ function ProductPage({ product, nav, onAdd, onBuyNow, qty, reviews = [], onAddRe
             <Heart size={18} fill={isWishlisted ? COLORS.danger : 'none'} color={isWishlisted ? COLORS.danger : COLORS.inkSoft} />
           </button>
         )}
+        <button
+          onClick={async () => {
+            const url = `${window.location.origin}${window.location.pathname}?p=${product.id}`;
+            const text = `Check out ${product.name} \u2014 ${url}`;
+            if (navigator.share) {
+              try { await navigator.share({ title: product.name, text, url }); } catch (e) { /* cancelled */ }
+            } else {
+              window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+            }
+          }}
+          className="absolute top-3 flex items-center justify-center rounded-full"
+          style={{ right: onToggleWishlist ? 51 : 12, width: 36, height: 36, background: 'rgba(255,255,255,0.9)' }}
+        >
+          <Share2 size={17} color={COLORS.inkSoft} />
+        </button>
       </div>
       <div className="p-4">
         <div className="flex items-center gap-2 mb-2">
@@ -1154,6 +1217,15 @@ function CheckoutPage({ cartItems, subtotal, deliverySettings, nav, placeOrder }
     if (form.pincode.length === 6) setZone(checkDeliveryZone(form.pincode, deliverySettings));
     else setZone(null);
   }, [form.pincode]);
+
+  useEffect(() => {
+    window.storage.get('mm-profile').then((r) => {
+      if (r && r.value) {
+        const saved = JSON.parse(r.value);
+        setForm((f) => (f.name || f.mobile || f.address || f.pincode ? f : { name: saved.name || '', mobile: saved.mobile || '', address: saved.address || '', pincode: saved.pincode || '' }));
+      }
+    }).catch(() => {});
+  }, []);
 
   const belowMin = subtotal < deliverySettings.minOrderValue;
   const deliveryCharge = subtotal >= deliverySettings.freeDeliveryThreshold ? 0 : deliverySettings.deliveryCharge;
@@ -1453,15 +1525,35 @@ function AboutPage({ deliverySettings, nav }) {
 
       <div>
         <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 13, color: COLORS.ink, marginBottom: 10 }}>Help</p>
-        <button onClick={() => nav('faq')} className="w-full flex items-center gap-3 rounded-xl p-3.5 text-left" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
-          <div className="rounded-full flex items-center justify-center" style={{ width: 36, height: 36, background: `${COLORS.blue}1A` }}>
-            <ClipboardList size={17} color={COLORS.blue} />
-          </div>
-          <div className="flex-1">
-            <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>Frequently Asked Questions</p>
-          </div>
-          <ChevronRight size={16} color={COLORS.inkSoft} />
-        </button>
+        <div className="flex flex-col gap-2.5">
+          <button onClick={() => nav('profile')} className="w-full flex items-center gap-3 rounded-xl p-3.5 text-left" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+            <div className="rounded-full flex items-center justify-center" style={{ width: 36, height: 36, background: `${COLORS.primary}1A` }}>
+              <Users size={17} color={COLORS.primary} />
+            </div>
+            <div className="flex-1">
+              <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>My Details</p>
+            </div>
+            <ChevronRight size={16} color={COLORS.inkSoft} />
+          </button>
+          <button onClick={() => nav('my-orders')} className="w-full flex items-center gap-3 rounded-xl p-3.5 text-left" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+            <div className="rounded-full flex items-center justify-center" style={{ width: 36, height: 36, background: `${COLORS.secondary}1A` }}>
+              <Package size={17} color={COLORS.secondary} />
+            </div>
+            <div className="flex-1">
+              <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>My Orders</p>
+            </div>
+            <ChevronRight size={16} color={COLORS.inkSoft} />
+          </button>
+          <button onClick={() => nav('faq')} className="w-full flex items-center gap-3 rounded-xl p-3.5 text-left" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+            <div className="rounded-full flex items-center justify-center" style={{ width: 36, height: 36, background: `${COLORS.blue}1A` }}>
+              <ClipboardList size={17} color={COLORS.blue} />
+            </div>
+            <div className="flex-1">
+              <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>Frequently Asked Questions</p>
+            </div>
+            <ChevronRight size={16} color={COLORS.inkSoft} />
+          </button>
+        </div>
       </div>
 
       <div>
@@ -1497,6 +1589,125 @@ function LegalSection({ heading, children }) {
     <div>
       <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 13, color: COLORS.ink, marginBottom: 6 }}>{heading}</p>
       <div style={{ fontFamily: bodyFont, fontSize: 12.5, color: COLORS.inkSoft, lineHeight: 1.65 }}>{children}</div>
+    </div>
+  );
+}
+
+function MyOrdersPage({ deliverySettings }) {
+  const [loading, setLoading] = useState(true);
+  const [ordersList, setOrdersList] = useState([]);
+  const [viewOrder, setViewOrder] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      if (!BACKEND_ENABLED) { setLoading(false); return; }
+      try {
+        const r = await window.storage.get('mm-my-orders');
+        const ids = r && r.value ? JSON.parse(r.value) : [];
+        if (!ids.length) { setLoading(false); return; }
+        const results = await Promise.allSettled(ids.map((id) => sbRpc('get_order_by_id', { p_id: id })));
+        const found = results
+          .filter((res) => res.status === 'fulfilled' && res.value && res.value[0])
+          .map((res) => mapSalesLogFromDb(res.value[0]))
+          .sort((a, b) => b.createdAt - a.createdAt);
+        setOrdersList(found);
+      } catch (e) {
+        console.error('Could not load order history:', e);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  if (loading) {
+    return <div className="p-8 text-center"><p style={{ fontFamily: bodyFont, fontSize: 12.5, color: COLORS.inkSoft }}>Loading your orders&hellip;</p></div>;
+  }
+
+  return (
+    <div className="p-4 pb-10">
+      <p style={{ fontFamily: bodyFont, fontSize: 12, color: COLORS.inkSoft, lineHeight: 1.6, marginBottom: 16 }}>
+        Shows orders placed from this device only \u2014 nothing here is linked to an account, so it won\u2019t appear on a different phone or browser.
+      </p>
+      {!ordersList.length && (
+        <div className="flex flex-col items-center pt-10">
+          <Package size={36} color={COLORS.border} />
+          <p style={{ fontFamily: bodyFont, fontSize: 12.5, color: COLORS.inkSoft, marginTop: 10 }}>No orders placed from this device yet.</p>
+        </div>
+      )}
+      <div className="flex flex-col gap-2.5">
+        {ordersList.map((o) => (
+          <button key={o.id} onClick={() => setViewOrder(o)} className="w-full flex items-center gap-3 rounded-xl p-3.5 text-left" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+            <div className="flex-1 min-w-0">
+              <p style={{ fontFamily: monoFont, fontWeight: 700, fontSize: 12, color: COLORS.ink }}>{o.id}</p>
+              <p style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft }}>{new Date(o.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} &bull; {o.items.length} item{o.items.length === 1 ? '' : 's'}</p>
+            </div>
+            <p style={{ fontFamily: monoFont, fontWeight: 700, fontSize: 13, color: COLORS.ink }}>{money(o.total)}</p>
+            <ChevronRight size={16} color={COLORS.inkSoft} />
+          </button>
+        ))}
+      </div>
+      {viewOrder && <InvoiceOverlay order={viewOrder} deliverySettings={deliverySettings} onClose={() => setViewOrder(null)} />}
+    </div>
+  );
+}
+
+function ProfilePage() {
+  const [form, setForm] = useState({ name: '', mobile: '', address: '', pincode: '' });
+  const [loaded, setLoaded] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    window.storage.get('mm-profile').then((r) => {
+      if (r && r.value) setForm({ ...form, ...JSON.parse(r.value) });
+    }).catch(() => {}).finally(() => setLoaded(true));
+  }, []);
+
+  const set = (k) => (e) => { setForm({ ...form, [k]: e.target.value }); setSaved(false); };
+
+  const save = () => {
+    window.storage.set('mm-profile', JSON.stringify(form)).then(() => {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    }).catch(() => {});
+  };
+
+  const clearProfile = () => {
+    window.storage.delete('mm-profile').then(() => {
+      setForm({ name: '', mobile: '', address: '', pincode: '' });
+    }).catch(() => {});
+  };
+
+  if (!loaded) return null;
+
+  return (
+    <div className="p-4 pb-10 flex flex-col gap-4">
+      <p style={{ fontFamily: bodyFont, fontSize: 12, color: COLORS.inkSoft, lineHeight: 1.6 }}>
+        Save your details here once, and we&rsquo;ll fill them in automatically next time you check out. This is saved only on this device &mdash; we don&apos;t store it anywhere else, and nobody else can see it.
+      </p>
+
+      <label className="flex flex-col gap-1.5">
+        <span style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.inkSoft, fontWeight: 700 }}>Full Name</span>
+        <input value={form.name} onChange={set('name')} placeholder="Your name" className="px-3.5 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none' }} />
+      </label>
+      <label className="flex flex-col gap-1.5">
+        <span style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.inkSoft, fontWeight: 700 }}>Mobile Number</span>
+        <input value={form.mobile} onChange={set('mobile')} placeholder="10-digit mobile number" className="px-3.5 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 13, outline: 'none' }} />
+      </label>
+      <label className="flex flex-col gap-1.5">
+        <span style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.inkSoft, fontWeight: 700 }}>Delivery Address</span>
+        <textarea value={form.address} onChange={set('address')} placeholder="House no., street, landmark" rows={3} className="px-3.5 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none', resize: 'none' }} />
+      </label>
+      <label className="flex flex-col gap-1.5">
+        <span style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.inkSoft, fontWeight: 700 }}>Pincode</span>
+        <input value={form.pincode} onChange={set('pincode')} placeholder="6-digit pincode" maxLength={6} className="px-3.5 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 13, outline: 'none' }} />
+      </label>
+
+      <button onClick={save} className="w-full py-3.5 rounded-xl mt-2" style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 14 }}>
+        {saved ? 'Saved \u2713' : 'Save My Details'}
+      </button>
+      <button onClick={clearProfile} className="w-full py-3" style={{ color: COLORS.danger, fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>
+        Clear My Saved Details
+      </button>
     </div>
   );
 }
@@ -1751,19 +1962,127 @@ function AdminTabs({ tab, setTab }) {
   );
 }
 
-function AdminOverview({ products, orders }) {
-  const revenue = orders.reduce((s, o) => s + o.total, 0);
-  const pending = orders.filter((o) => o.status !== 'Delivered').length;
+function InvoiceOverlay({ order, deliverySettings, onClose }) {
+  const gst = deliverySettings.gstNumber;
+  return (
+    <div className="fixed inset-0 flex justify-center" style={{ background: 'rgba(0,0,0,0.4)', zIndex: 9999 }}>
+      <div className="w-full flex flex-col" style={{ maxWidth: 448, maxHeight: '100vh', overflowY: 'auto', background: '#fff' }}>
+        <div className="flex items-center justify-between px-4 py-3 no-print" style={{ borderBottom: '1px solid #eee', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
+          <span style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 14, color: '#1a1a1a' }}>Invoice</span>
+          <div className="flex gap-2">
+            <button onClick={() => window.print()} className="px-3 py-1.5 rounded-full" style={{ background: '#1a1a1a', color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 11.5 }}>Print / Save PDF</button>
+            <button onClick={onClose} className="px-3 py-1.5 rounded-full" style={{ border: '1px solid #ddd', fontFamily: bodyFont, fontWeight: 700, fontSize: 11.5, color: '#1a1a1a' }}>Close</button>
+          </div>
+        </div>
+
+        <div className="p-6" style={{ color: '#1a1a1a' }}>
+          <div className="flex justify-between items-start mb-6">
+            <div>
+              <p style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 20 }}>{deliverySettings.shopName}</p>
+              <p style={{ fontFamily: bodyFont, fontSize: 11, color: '#666', marginTop: 2 }}>{deliverySettings.shopArea}</p>
+              {gst && <p style={{ fontFamily: monoFont, fontSize: 10.5, color: '#666', marginTop: 2 }}>GSTIN: {gst}</p>}
+            </div>
+            <div className="text-right">
+              <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 13 }}>INVOICE</p>
+              <p style={{ fontFamily: monoFont, fontSize: 11, color: '#666', marginTop: 2 }}>{order.id}</p>
+              <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: '#666', marginTop: 2 }}>{new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+            </div>
+          </div>
+
+          <div className="mb-6">
+            <p style={{ fontFamily: bodyFont, fontSize: 10, color: '#999', fontWeight: 700, letterSpacing: 0.5, marginBottom: 4 }}>BILLED TO</p>
+            <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 13 }}>{order.name}</p>
+            <p style={{ fontFamily: bodyFont, fontSize: 11.5, color: '#555', marginTop: 2 }}>{order.address}, {order.pincode}</p>
+            <p style={{ fontFamily: monoFont, fontSize: 11.5, color: '#555', marginTop: 2 }}>{order.mobile}</p>
+          </div>
+
+          <table className="w-full" style={{ borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid #1a1a1a' }}>
+                <th style={{ textAlign: 'left', padding: '6px 4px', fontFamily: bodyFont, fontSize: 10.5, fontWeight: 700 }}>Item</th>
+                <th style={{ textAlign: 'center', padding: '6px 4px', fontFamily: bodyFont, fontSize: 10.5, fontWeight: 700 }}>Qty</th>
+                <th style={{ textAlign: 'right', padding: '6px 4px', fontFamily: bodyFont, fontSize: 10.5, fontWeight: 700 }}>Price</th>
+                <th style={{ textAlign: 'right', padding: '6px 4px', fontFamily: bodyFont, fontSize: 10.5, fontWeight: 700 }}>Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {order.items.map((it, i) => (
+                <tr key={i} style={{ borderBottom: '1px solid #eee' }}>
+                  <td style={{ padding: '8px 4px', fontFamily: bodyFont, fontSize: 12 }}>{it.name}</td>
+                  <td style={{ padding: '8px 4px', textAlign: 'center', fontFamily: monoFont, fontSize: 12 }}>{it.qty}</td>
+                  <td style={{ padding: '8px 4px', textAlign: 'right', fontFamily: monoFont, fontSize: 12 }}>{money(it.price)}</td>
+                  <td style={{ padding: '8px 4px', textAlign: 'right', fontFamily: monoFont, fontSize: 12 }}>{money(it.price * it.qty)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          <div className="flex flex-col items-end mt-4 gap-1.5">
+            <div className="flex justify-between" style={{ width: 200 }}>
+              <span style={{ fontFamily: bodyFont, fontSize: 11.5, color: '#555' }}>Subtotal</span>
+              <span style={{ fontFamily: monoFont, fontSize: 11.5 }}>{money(order.subtotal)}</span>
+            </div>
+            <div className="flex justify-between" style={{ width: 200 }}>
+              <span style={{ fontFamily: bodyFont, fontSize: 11.5, color: '#555' }}>Delivery</span>
+              <span style={{ fontFamily: monoFont, fontSize: 11.5 }}>{order.deliveryCharge === 0 ? 'FREE' : money(order.deliveryCharge)}</span>
+            </div>
+            <div className="flex justify-between mt-1 pt-1.5" style={{ width: 200, borderTop: '1.5px solid #1a1a1a' }}>
+              <span style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 13 }}>Total</span>
+              <span style={{ fontFamily: monoFont, fontWeight: 700, fontSize: 13 }}>{money(order.total)}</span>
+            </div>
+          </div>
+
+          <div className="mt-6 pt-4" style={{ borderTop: '1px solid #eee' }}>
+            <p style={{ fontFamily: bodyFont, fontSize: 11, color: '#555' }}>Payment: {paymentLabel(order.payment)}{order.paymentRef ? ` (Ref: ${order.paymentRef})` : ''}</p>
+          </div>
+
+          <p style={{ fontFamily: bodyFont, fontSize: 10, color: '#999', textAlign: 'center', marginTop: 24 }}>Thank you for shopping with {deliverySettings.shopName}!</p>
+        </div>
+      </div>
+      <style>{`@media print { .no-print { display: none !important; } }`}</style>
+    </div>
+  );
+}
+
+function AdminOverview({ products, salesLog, onRefresh, onViewInvoice }) {
+  const now = Date.now();
+  const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
+  const startOfWeek = new Date(startOfToday.getTime() - 6 * 86400000);
+  const todaySales = salesLog.filter((o) => o.createdAt >= startOfToday.getTime());
+  const weekSales = salesLog.filter((o) => o.createdAt >= startOfWeek.getTime());
+  const revenue = salesLog.reduce((s, o) => s + o.total, 0);
   const kpis = [
-    { label: 'Total Orders', value: orders.length, color: COLORS.primary },
-    { label: 'Revenue', value: money(revenue), color: COLORS.secondary },
-    { label: 'Pending Orders', value: pending, color: COLORS.rose },
-    { label: 'Products Listed', value: products.length, color: COLORS.gold },
+    { label: 'Total Orders', value: salesLog.length, color: COLORS.primary },
+    { label: 'Total Revenue', value: money(revenue), color: COLORS.secondary },
+    { label: "Today's Sales", value: money(todaySales.reduce((s, o) => s + o.total, 0)), color: COLORS.gold },
+    { label: "This Week's Sales", value: money(weekSales.reduce((s, o) => s + o.total, 0)), color: COLORS.rose },
   ];
-  const byStatus = STATUS_STEPS.map((s) => ({ status: s, count: orders.filter((o) => o.status === s).length }));
-  const maxCount = Math.max(1, ...byStatus.map((b) => b.count));
+
+  const bestSellerMap = {};
+  salesLog.forEach((o) => {
+    o.items.forEach((it) => {
+      if (!bestSellerMap[it.name]) bestSellerMap[it.name] = 0;
+      bestSellerMap[it.name] += it.qty;
+    });
+  });
+  const bestSellers = Object.entries(bestSellerMap).map(([name, qty]) => ({ name, qty })).sort((a, b) => b.qty - a.qty).slice(0, 5);
+  const maxQty = Math.max(1, ...bestSellers.map((b) => b.qty));
+
+  if (!BACKEND_ENABLED) {
+    return (
+      <div className="p-4">
+        <p style={{ fontFamily: bodyFont, color: COLORS.inkSoft, fontSize: 12.5, textAlign: 'center', marginTop: 40 }}>Sales reports need the store's backend connected.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="p-4">
+      <div className="flex justify-end mb-3">
+        <button onClick={onRefresh} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full" style={{ border: `1px solid ${COLORS.border}` }}>
+          <span style={{ fontFamily: bodyFont, fontSize: 11, fontWeight: 700, color: COLORS.ink }}>Refresh</span>
+        </button>
+      </div>
       <div className="grid grid-cols-2 gap-3 mb-5">
         {kpis.map((k) => (
           <div key={k.label} className="rounded-2xl p-4" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
@@ -1772,14 +2091,39 @@ function AdminOverview({ products, orders }) {
           </div>
         ))}
       </div>
-      <div className="rounded-2xl p-4" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
-        <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink, marginBottom: 12 }}>Orders by Status</p>
-        <div className="flex items-end gap-3" style={{ height: 120 }}>
-          {byStatus.map((b) => (
-            <div key={b.status} className="flex-1 flex flex-col items-center gap-1.5 justify-end h-full">
-              <span style={{ fontFamily: monoFont, fontSize: 11, color: COLORS.ink }}>{b.count}</span>
-              <div className="w-full rounded-t-md" style={{ height: Math.max(6, (b.count / maxCount) * 80), background: COLORS.secondary }} />
-              <span style={{ fontFamily: bodyFont, fontSize: 8.5, color: COLORS.inkSoft, textAlign: 'center' }}>{b.status}</span>
+
+      <div className="rounded-2xl p-4 mb-5" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+        <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink, marginBottom: 12 }}>Best Sellers</p>
+        {!bestSellers.length && <p style={{ fontFamily: bodyFont, fontSize: 12, color: COLORS.inkSoft }}>No sales yet.</p>}
+        <div className="flex flex-col gap-2.5">
+          {bestSellers.map((b) => (
+            <div key={b.name}>
+              <div className="flex justify-between mb-1">
+                <span style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.ink }}>{b.name}</span>
+                <span style={{ fontFamily: monoFont, fontSize: 11.5, color: COLORS.inkSoft }}>{b.qty} sold</span>
+              </div>
+              <div className="w-full rounded-full" style={{ height: 7, background: COLORS.cream }}>
+                <div className="rounded-full" style={{ height: 7, width: `${Math.max(6, (b.qty / maxQty) * 100)}%`, background: COLORS.primary }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="rounded-2xl overflow-hidden" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+        <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink, padding: '14px 16px 8px' }}>Recent Orders</p>
+        {!salesLog.length && <p style={{ fontFamily: bodyFont, fontSize: 12, color: COLORS.inkSoft, padding: '0 16px 16px' }}>No orders logged yet.</p>}
+        <div className="flex flex-col">
+          {salesLog.slice(0, 30).map((o) => (
+            <div key={o.id} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: `1px solid ${COLORS.border}` }}>
+              <div className="flex-1 min-w-0">
+                <p style={{ fontFamily: monoFont, fontSize: 11.5, color: COLORS.ink, fontWeight: 700 }}>{o.id}</p>
+                <p style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft }}>{o.name} &bull; {new Date(o.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</p>
+              </div>
+              <p style={{ fontFamily: monoFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>{money(o.total)}</p>
+              <button onClick={() => onViewInvoice(o)} className="px-3 py-1.5 rounded-full" style={{ border: `1px solid ${COLORS.border}` }}>
+                <span style={{ fontFamily: bodyFont, fontSize: 10.5, fontWeight: 700, color: COLORS.primary }}>Invoice</span>
+              </button>
             </div>
           ))}
         </div>
@@ -1791,8 +2135,72 @@ function AdminOverview({ products, orders }) {
 function AdminProducts({ products, setProducts, categories, customCategories, setCustomCategories }) {
   const [showAdd, setShowAdd] = useState(false);
   const [showCats, setShowCats] = useState(false);
+  const [showBulk, setShowBulk] = useState(false);
+  const [importMsg, setImportMsg] = useState('');
+  const fileInputRef = useRef(null);
   const [catForm, setCatForm] = useState({ name: '', emoji: '\ud83c\udff7\ufe0f', color: '#D9730D' });
   const [form, setForm] = useState({ name: '', category: categories[0].id, price: '', mrp: '', stock: '', emoji: '\ud83d\udecd\ufe0f', desc: '', imageUrl: '' });
+
+  const CSV_HEADERS = ['name', 'category', 'price', 'mrp', 'stock', 'emoji', 'desc', 'imageUrl'];
+
+  const downloadSample = () => {
+    downloadTextFile('sample-products.csv', toCSV(CSV_HEADERS, [
+      { name: 'Sample Face Wash', category: categories[0].id, price: 199, mrp: 249, stock: 20, emoji: '\ud83e\uddf4', desc: 'A gentle daily face wash.', imageUrl: '' },
+    ]));
+  };
+
+  const exportProducts = () => {
+    downloadTextFile('kuljeet-store-products.csv', toCSV(CSV_HEADERS, products.map((p) => ({
+      name: p.name, category: p.category, price: p.price, mrp: p.mrp, stock: p.stock, emoji: p.emoji, desc: p.desc, imageUrl: p.imageUrl || '',
+    }))));
+  };
+
+  const handleImportFile = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    setImportMsg('Importing\u2026');
+    try {
+      const text = await file.text();
+      const rows = parseCSV(text).filter((r) => r.length && r.some((c) => c.trim() !== ''));
+      if (rows.length < 2) { setImportMsg('That file has no product rows in it.'); return; }
+      const headerRow = rows[0].map((h) => h.trim().toLowerCase());
+      const validCatIds = new Set(categories.map((c) => c.id));
+      const drafts = [];
+      let skipped = 0;
+      for (const r of rows.slice(1)) {
+        const obj = {};
+        headerRow.forEach((h, i) => { obj[h] = (r[i] || '').trim(); });
+        if (!obj.name || !obj.price || !obj.mrp) { skipped++; continue; }
+        drafts.push({
+          category: validCatIds.has(obj.category) ? obj.category : categories[0].id,
+          name: obj.name, price: Number(obj.price) || 0, mrp: Number(obj.mrp) || 0,
+          stock: Number(obj.stock) || 0, emoji: obj.emoji || '\ud83d\udecd\ufe0f',
+          desc: obj.desc || 'A trusted everyday pick from our store shelves.',
+          imageUrl: obj.imageurl || '',
+        });
+      }
+      if (!drafts.length) { setImportMsg('No valid rows found \u2014 check against the sample CSV format.'); return; }
+      if (BACKEND_ENABLED) {
+        const rowsToInsert = drafts.map((d, i) => {
+          const [g1, g2] = grad(products.length + i);
+          return { category: d.category, name: d.name, price: d.price, mrp: d.mrp, stock: d.stock, emoji: d.emoji, g1, g2, rating: 4.0, best_seller: false, is_new: true, deal: false, description: d.desc, image_url: d.imageUrl || null };
+        });
+        const inserted = await sbInsert('products', rowsToInsert);
+        setProducts([...products, ...inserted.map(mapProductFromDb)]);
+      } else {
+        setProducts([...products, ...drafts.map((d, i) => {
+          const [g1, g2] = grad(products.length + i);
+          return { id: 'p' + Date.now() + i, ...d, rating: 4.0, g1, g2, bestSeller: false, isNew: true, deal: false };
+        })]);
+      }
+      setImportMsg(`Added ${drafts.length} product${drafts.length > 1 ? 's' : ''}${skipped ? `, skipped ${skipped} incomplete row${skipped > 1 ? 's' : ''}` : ''}.`);
+    } catch (err) {
+      console.error('CSV import failed:', err);
+      setImportMsg('Could not read that file \u2014 make sure it\u2019s a CSV exported from Excel or Google Sheets.');
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   const addCategory = () => {
     if (!catForm.name.trim()) return;
@@ -1884,6 +2292,29 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
         </div>
       )}
 
+      <button onClick={() => setShowBulk(!showBulk)} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl mb-3" style={{ border: `1.5px solid ${COLORS.ink}`, color: COLORS.ink }}>
+        <ClipboardList size={15} /> <span style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 13 }}>{showBulk ? 'Close Bulk Upload' : 'Bulk Upload / Export (CSV)'}</span>
+      </button>
+
+      {showBulk && (
+        <div className="rounded-2xl p-4 mb-4 flex flex-col gap-3" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+          <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft, lineHeight: 1.5 }}>
+            Add many products at once from a spreadsheet, instead of one by one. Columns needed: name, category, price, mrp, stock, emoji, desc, imageUrl (only name, price, mrp are required).
+          </p>
+          <button onClick={downloadSample} className="py-2.5 rounded-lg" style={{ border: `1px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>
+            Download Sample CSV
+          </button>
+          <button onClick={exportProducts} className="py-2.5 rounded-lg" style={{ border: `1px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>
+            Export My Current Products to CSV
+          </button>
+          <label className="py-2.5 rounded-lg text-center" style={{ background: COLORS.ink, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, cursor: 'pointer' }}>
+            Import CSV File
+            <input ref={fileInputRef} type="file" accept=".csv" onChange={handleImportFile} className="hidden" />
+          </label>
+          {importMsg && <p style={{ fontFamily: bodyFont, fontSize: 11.5, color: importMsg.startsWith('Added') ? COLORS.secondary : COLORS.ink }}>{importMsg}</p>}
+        </div>
+      )}
+
       <button onClick={() => setShowAdd(!showAdd)} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl mb-4" style={{ background: COLORS.ink, color: '#fff' }}>
         <PlusCircle size={16} /> <span style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 13 }}>{showAdd ? 'Close Form' : 'Add Product'}</span>
       </button>
@@ -1969,7 +2400,7 @@ function AdminDelivery({ settings, setSettings, categories }) {
     setSettings(local);
     if (BACKEND_ENABLED) {
       sbUpdate('delivery_settings', 'id=eq.1', {
-        shop_name: local.shopName, shop_area: local.shopArea, shop_pincode: local.shopPincode, mode: local.mode,
+        shop_name: local.shopName, shop_area: local.shopArea, shop_pincode: local.shopPincode, mode: local.mode, gst_number: local.gstNumber || null,
         radius_km: local.radiusKm, min_order_value: local.minOrderValue, delivery_charge: local.deliveryCharge,
         free_delivery_threshold: local.freeDeliveryThreshold, whatsapp_number: local.whatsappNumber, upi_id: local.upiId,
         open_time: local.openTime, close_time: local.closeTime,
@@ -2007,6 +2438,7 @@ function AdminDelivery({ settings, setSettings, categories }) {
         {field('Shop name', local.shopName, (e) => setLocal({ ...local, shopName: e.target.value }))}
         {field('Shop area', local.shopArea, (e) => setLocal({ ...local, shopArea: e.target.value }))}
         {field('Shop pincode', local.shopPincode, (e) => setLocal({ ...local, shopPincode: e.target.value.replace(/\D/g, '').slice(0, 6) }), true)}
+        {field('GST number (optional, shown on invoices)', local.gstNumber, (e) => setLocal({ ...local, gstNumber: e.target.value.toUpperCase() }))}
         {field('WhatsApp number (with country code, no +)', local.whatsappNumber, (e) => setLocal({ ...local, whatsappNumber: e.target.value.replace(/\D/g, '') }), true)}
         {field('UPI ID (for UPI payment option, e.g. name@okaxis)', local.upiId, (e) => setLocal({ ...local, upiId: e.target.value.trim() }), true)}
       </div>
@@ -2212,9 +2644,10 @@ function AdminSecurity({ adminPassword, setAdminPassword, adminEmail }) {
   );
 }
 
-function AdminCustomers({ orders }) {
+function AdminCustomers({ salesLog }) {
   const map = {};
-  orders.forEach((o) => {
+  salesLog.forEach((o) => {
+    if (!o.mobile) return;
     if (!map[o.mobile]) map[o.mobile] = { name: o.name, mobile: o.mobile, address: o.address, pincode: o.pincode, orders: 0, spent: 0 };
     map[o.mobile].orders += 1;
     map[o.mobile].spent += o.total;
@@ -2222,6 +2655,13 @@ function AdminCustomers({ orders }) {
     map[o.mobile].address = o.address;
   });
   const customers = Object.values(map).sort((a, b) => b.spent - a.spent);
+  if (!BACKEND_ENABLED) {
+    return (
+      <div className="p-4">
+        <p style={{ fontFamily: bodyFont, color: COLORS.inkSoft, fontSize: 12.5, textAlign: 'center', marginTop: 40 }}>Customer history needs the store's backend connected.</p>
+      </div>
+    );
+  }
   return (
     <div className="p-4">
       {!customers.length && <p style={{ fontFamily: bodyFont, color: COLORS.inkSoft, fontSize: 12.5, textAlign: 'center', marginTop: 40 }}>No customers yet.</p>}
@@ -2244,7 +2684,7 @@ function AdminCustomers({ orders }) {
   );
 }
 
-function AdminPage({ products, setProducts, orders, deliverySettings, setDeliverySettings, onLogout, adminPassword, setAdminPassword, allRealCategories, customCategories, setCustomCategories, adminEmail }) {
+function AdminPage({ products, setProducts, salesLog, refreshSalesLog, onViewInvoice, deliverySettings, setDeliverySettings, onLogout, adminPassword, setAdminPassword, allRealCategories, customCategories, setCustomCategories, adminEmail }) {
   const [tab, setTab] = useState('overview');
   return (
     <div className="pb-6">
@@ -2253,10 +2693,10 @@ function AdminPage({ products, setProducts, orders, deliverySettings, setDeliver
         <button onClick={onLogout} className="flex items-center gap-1"><LogOut size={15} color={COLORS.inkSoft} /><span style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.inkSoft }}>Logout</span></button>
       </div>
       <AdminTabs tab={tab} setTab={setTab} />
-      {tab === 'overview' && <AdminOverview products={products} orders={orders} />}
+      {tab === 'overview' && <AdminOverview products={products} salesLog={salesLog} onRefresh={refreshSalesLog} onViewInvoice={onViewInvoice} />}
       {tab === 'products' && <AdminProducts products={products} setProducts={setProducts} categories={allRealCategories} customCategories={customCategories} setCustomCategories={setCustomCategories} />}
       {tab === 'delivery' && <AdminDelivery settings={deliverySettings} setSettings={setDeliverySettings} categories={allRealCategories} />}
-      {tab === 'customers' && <AdminCustomers orders={orders} />}
+      {tab === 'customers' && <AdminCustomers salesLog={salesLog} />}
       {tab === 'security' && <AdminSecurity adminPassword={adminPassword} setAdminPassword={setAdminPassword} adminEmail={adminEmail} />}
     </div>
   );
@@ -2269,13 +2709,22 @@ export default function App() {
   const [deliverySettings, setDeliverySettings] = useState(SEED_DELIVERY);
   applyTheme(theme, deliverySettings); // mutate the shared COLORS object before this render's JSX reads it
   const [products, setProducts] = useState(SEED_PRODUCTS);
-  const [orders] = useState([]);
+  const [salesLog, setSalesLog] = useState([]);
+  const [viewInvoice, setViewInvoice] = useState(null);
   const [cart, setCart] = useState({});
   const [route, setRoute] = useState({ page: 'home', params: {} });
   const [query, setQuery] = useState('');
   const [deliveryArea, setDeliveryArea] = useState('');
   const [showLocationModal, setShowLocationModal] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const refreshSalesLog = async () => {
+    if (!BACKEND_ENABLED) return;
+    try {
+      const rows = await sbSelect('sales_log', '?select=*&order=created_at.desc&limit=500');
+      setSalesLog(rows.map(mapSalesLogFromDb));
+    } catch (e) { console.error('Failed to load sales log:', e); }
+  };
+  useEffect(() => { if (isAdmin) refreshSalesLog(); }, [isAdmin]);
   const [adminEmail, setAdminEmail] = useState('');
   const adminRefreshRef = useRef(null);
   const [adminPassword, setAdminPassword] = useState('admin123');
@@ -2387,6 +2836,18 @@ export default function App() {
     })();
   }, []);
 
+  const deepLinkHandled = useRef(false);
+  useEffect(() => {
+    if (!loaded || deepLinkHandled.current || !products.length) return;
+    deepLinkHandled.current = true;
+    try {
+      const pid = new URLSearchParams(window.location.search).get('p');
+      if (pid && products.some((p) => p.id === pid)) {
+        setRoute({ page: 'product', params: { id: pid } });
+      }
+    } catch (e) { /* ignore malformed URL */ }
+  }, [loaded, products]);
+
   useEffect(() => { if (loaded && !BACKEND_ENABLED) window.storage.set('mm-products', JSON.stringify(products)).catch(() => {}); }, [products, loaded]);
   useEffect(() => { if (loaded && !BACKEND_ENABLED) window.storage.set('mm-delivery', JSON.stringify(deliverySettings)).catch(() => {}); }, [deliverySettings, loaded]);
   useEffect(() => { if (loaded) window.storage.set('mm-cart', JSON.stringify(cart)).catch(() => {}); }, [cart, loaded]);
@@ -2478,11 +2939,24 @@ export default function App() {
     const waLink = `https://wa.me/${deliverySettings.whatsappNumber}?text=${encodeURIComponent(msg)}`;
     if (BACKEND_ENABLED) {
       sbRpc('decrement_stock', { items: items.map((i) => ({ id: i.id, qty: i.qty })) }).catch((e) => console.error('Stock decrement failed to sync:', e));
+      sbInsert('sales_log', [{
+        id: orderId, customer_name: data.name, customer_mobile: data.mobile, customer_address: data.address, customer_pincode: data.pincode,
+        items, subtotal: data.subtotal, delivery_charge: data.deliveryCharge, total: data.total, payment: data.payment, payment_ref: data.paymentId || null,
+      }]).catch((e) => console.error('Sales log failed to sync:', e));
     }
     setProducts(products.map((p) => {
       const bought = items.find((i) => i.id === p.id);
       return bought ? { ...p, stock: Math.max((p.stock ?? 0) - bought.qty, 0) } : p;
     }));
+    window.storage.set('mm-profile', JSON.stringify({ name: data.name, mobile: data.mobile, address: data.address, pincode: data.pincode })).catch(() => {});
+    if (BACKEND_ENABLED) {
+      window.storage.get('mm-my-orders').then((r) => {
+        const ids = r && r.value ? JSON.parse(r.value) : [];
+        window.storage.set('mm-my-orders', JSON.stringify([orderId, ...ids].slice(0, 50))).catch(() => {});
+      }).catch(() => {
+        window.storage.set('mm-my-orders', JSON.stringify([orderId])).catch(() => {});
+      });
+    }
     setCart({});
     window.location.href = waLink;
   };
@@ -2515,7 +2989,7 @@ export default function App() {
 
   const isAdminRoute = route.page === 'admin';
   const showHeader = !isAdminRoute && route.page !== 'product' && route.page !== 'checkout';
-  const showBackHeader = route.page === 'category' || route.page === 'product' || route.page === 'checkout' || route.page === 'list' || route.page === 'about' || route.page === 'terms' || route.page === 'privacy' || route.page === 'faq';
+  const showBackHeader = route.page === 'category' || route.page === 'product' || route.page === 'checkout' || route.page === 'list' || route.page === 'about' || route.page === 'terms' || route.page === 'privacy' || route.page === 'faq' || route.page === 'profile' || route.page === 'my-orders';
 
   const headerTitleMap = {
     category: allCategories.find((c) => c.id === route.params.id)?.name,
@@ -2526,6 +3000,8 @@ export default function App() {
     terms: 'Terms & Conditions',
     privacy: 'Privacy Policy',
     faq: 'FAQs',
+    profile: 'My Details',
+    'my-orders': 'My Orders',
   };
 
   if (!loaded) {
@@ -2537,7 +3013,8 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen flex justify-center" style={{ background: COLORS.bg, fontFamily: bodyFont }}>
+    <>
+    <div className="min-h-screen flex justify-center app-shell" style={{ background: COLORS.bg, fontFamily: bodyFont }}>
       <div className="w-full flex flex-col" style={{ maxWidth: 448, minHeight: '100vh', background: COLORS.bg, boxShadow: '0 0 40px rgba(0,0,0,0.06)' }}>
         {showLocationModal && !isAdminRoute && (
           <LocationModal
@@ -2572,6 +3049,8 @@ export default function App() {
               : <div className="p-8 text-center" style={{ fontFamily: bodyFont, color: COLORS.inkSoft, fontSize: 13 }}>Your cart is empty.</div>
           )}
           {route.page === 'about' && <AboutPage deliverySettings={deliverySettings} nav={nav} />}
+          {route.page === 'profile' && <ProfilePage />}
+          {route.page === 'my-orders' && <MyOrdersPage deliverySettings={deliverySettings} />}
           {route.page === 'faq' && <FAQPage deliverySettings={deliverySettings} />}
           {route.page === 'terms' && <TermsPage deliverySettings={deliverySettings} />}
           {route.page === 'privacy' && <PrivacyPage deliverySettings={deliverySettings} />}
@@ -2580,7 +3059,7 @@ export default function App() {
           {route.page === 'admin' && isAdmin && (
             <AdminPage
               products={products} setProducts={setProducts}
-              orders={orders}
+              salesLog={salesLog} refreshSalesLog={refreshSalesLog} onViewInvoice={setViewInvoice}
               deliverySettings={deliverySettings} setDeliverySettings={setDeliverySettings}
               onLogout={() => {
                 setIsAdmin(false);
@@ -2600,5 +3079,8 @@ export default function App() {
         <BottomNav page={route.page} nav={nav} cartCount={cartCount} />
       </div>
     </div>
+    {viewInvoice && <InvoiceOverlay order={viewInvoice} deliverySettings={deliverySettings} onClose={() => setViewInvoice(null)} />}
+    <style>{`@media print { .app-shell { display: none !important; } }`}</style>
+    </>
   );
 }
