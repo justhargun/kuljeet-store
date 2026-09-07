@@ -124,6 +124,20 @@ const TRANSLATIONS = {
     addToWishlist: 'Add to Wishlist', maxInStock: 'Max in stock', onlyLeft: 'ONLY {n} LEFT', new: 'NEW', bestseller: 'BESTSELLER',
     storeClosed: 'Store Closed', openingWhatsapp: 'Opening WhatsApp...',
     enterName: 'Please enter your name.', enterMobile: 'Please enter a valid 10-digit mobile number.', enterAddress: 'Please enter your delivery address.',
+    deliveringToDoor: 'Delivering to your door', enterPincodeHint: 'Enter your 6-digit pincode so we can confirm we deliver to your area.',
+    enterPincodePlaceholder: 'Enter pincode e.g. 201301', weDeliverHere: 'We deliver here', noDeliveryHere: 'Sorry, we currently don\u2019t deliver to this location.',
+    confirmLocation: 'Confirm location', skipForNow: 'Skip for now, keep browsing',
+    shopByCategory: 'Shop by Category', bestSellers: 'Best Sellers', lovedByNeighbours: 'Loved by your neighbours',
+    newArrivals: 'New Arrivals', freshOnShelves: 'Fresh on our shelves', todaysDeals: 'Today\u2019s Deals', grabBeforeGone: 'Grab them before they\u2019re gone',
+    recommendedForYou: 'Recommended for You', aboutUsContact: 'About Us & Contact', shopNow: 'Shop Now', noProductsFound: 'No products found.',
+    myWishlist: 'My Wishlist', nothingSavedYet: 'Nothing saved yet.', browseProducts: 'Browse Products',
+    outOfStockLine: 'Out of stock', onlyLeftOrderSoon: 'Only {n} left \u2014 order soon', inStockCount: '{n} in stock',
+    ratingText: 'rating', reviewText: 'review', ratingsAndReviews: 'Ratings & Reviews', noReviewsYet: 'No reviews yet \u2014 be the first to share your experience.',
+    yourRating: 'Your rating', yourName: 'Your name', shareExperience: 'Share your experience (optional)', submitReview: 'Submit Review', cancel: 'Cancel',
+    faqTitle: 'Frequently Asked Questions', faqIntro: 'Quick answers about shopping with', cantFind: 'Can\u2019t find what you need? Reach us on WhatsApp at',
+    aboutContact: 'About Us & Contact', help: 'Help', myDetails: 'My Details', myOrders: 'My Orders', legal: 'Legal',
+    saveMyDetails: 'Save My Details', clearMyDetails: 'Clear My Saved Details', fullNameLabel: 'Full Name', mobileNumberLabel: 'Mobile Number',
+    deliveryAddressLabel: 'Delivery Address', pincodeLabel: 'Pincode',
   },
   hi: {
     home: '\u0939\u094b\u092e', categories: '\u0936\u094d\u0930\u0947\u0923\u093f\u092f\u093e\u0902', wishlist: '\u0935\u093f\u0936\u0932\u093f\u0938\u094d\u091f', cart: '\u0915\u093e\u0930\u094d\u091f', admin: '\u090f\u0921\u092e\u093f\u0928',
@@ -136,6 +150,20 @@ const TRANSLATIONS = {
     addToWishlist: '\u0935\u093f\u0936\u0932\u093f\u0938\u094d\u091f \u092e\u0947\u0902 \u091c\u094b\u0921\u093c\u0947\u0902', maxInStock: '\u0938\u094d\u091f\u0949\u0915 \u092e\u0947\u0902 \u0905\u0927\u093f\u0915\u0924\u092e', onlyLeft: '\u0938\u093f\u0930\u094d\u092b {n} \u092c\u091a\u0947 \u0939\u0948\u0902', new: '\u0928\u092f\u093e', bestseller: '\u092c\u0947\u0938\u094d\u091f\u0938\u0947\u0932\u0930',
     storeClosed: '\u0926\u0941\u0915\u093e\u0928 \u092c\u0902\u0926 \u0939\u0948', openingWhatsapp: '\u0935\u0949\u091f\u094d\u0938\u0910\u092a \u0916\u0941\u0932 \u0930\u0939\u093e \u0939\u0948...',
     enterName: '\u0915\u0943\u092a\u092f\u093e \u0905\u092a\u0928\u093e \u0928\u093e\u092e \u0926\u0930\u094d\u091c \u0915\u0930\u0947\u0902\u0964', enterMobile: '\u0915\u0943\u092a\u092f\u093e \u0938\u0939\u0940 10-\u0905\u0902\u0915\u094b\u0902 \u0915\u093e \u092e\u094b\u092c\u093e\u0907\u0932 \u0928\u0902\u092c\u0930 \u0926\u0930\u094d\u091c \u0915\u0930\u0947\u0902\u0964', enterAddress: '\u0915\u0943\u092a\u092f\u093e \u0905\u092a\u0928\u093e \u0921\u093f\u0932\u0940\u0935\u0930\u0940 \u092a\u0924\u093e \u0926\u0930\u094d\u091c \u0915\u0930\u0947\u0902\u0964',
+    deliveringToDoor: 'आपके दरवाज़े तक डिलीवरी', enterPincodeHint: 'हम आपके इलाके में डिलीवरी की पुष्टि कर सकें, इसके लिए अपना 6-अंकों का पिनकोड दर्ज करें।',
+    enterPincodePlaceholder: 'पिनकोड दर्ज करें जैसे 201301', weDeliverHere: 'हम यहाँ डिलीवरी करते हैं', noDeliveryHere: 'क्षमा करें, हम अभी इस स्थान पर डिलीवरी नहीं करते।',
+    confirmLocation: 'लोकेशन कन्फर्म करें', skipForNow: 'अभी छोड़ें, ब्राउज़िंग जारी रखें',
+    shopByCategory: 'श्रेणी अनुसार खरीदें', bestSellers: 'बेस्ट सेलर्स', lovedByNeighbours: 'आपके पड़ोसियों की पसंद',
+    newArrivals: 'नए उत्पाद', freshOnShelves: 'हमारी अलमारियों में ताज़ा', todaysDeals: 'आज के ऑफर', grabBeforeGone: 'खत्म होने से पहले पाएं',
+    recommendedForYou: 'आपके लिए सुझाव', aboutUsContact: 'हमारे बारे में और संपर्क', shopNow: 'अभी खरीदें', noProductsFound: 'कोई उत्पाद नहीं मिला।',
+    myWishlist: 'मेरी विशलिस्ट', nothingSavedYet: 'अभी तक कुछ भी सेव नहीं किया गया।', browseProducts: 'उत्पाद देखें',
+    outOfStockLine: 'स्टॉक खत्म', onlyLeftOrderSoon: 'केवल {n} बचे \u2014 जल्दी ऑर्डर करें', inStockCount: '{n} स्टॉक में',
+    ratingText: 'रेटिंग', reviewText: 'समीक्षा', ratingsAndReviews: 'रेटिंग्स और समीक्षाएं', noReviewsYet: 'अभी तक कोई समीक्षा नहीं \u2014 सबसे पहले अपना अनुभव साझा करें।',
+    yourRating: 'आपकी रेटिंग', yourName: 'आपका नाम', shareExperience: 'अपना अनुभव साझा करें (वैकल्पिक)', submitReview: 'समीक्षा सबमिट करें', cancel: 'रद्द करें',
+    faqTitle: 'अक्सर पूछे जाने वाले प्रश्न', faqIntro: 'खरीदारी से जुड़े त्वरित जवाब', cantFind: 'जो चाहिए वो नहीं मिला? हमें व्हाट्सएप पर संपर्क करें',
+    aboutContact: 'हमारे बारे में और संपर्क', help: 'सहायता', myDetails: 'मेरी जानकारी', myOrders: 'मेरे ऑर्डर', legal: 'कानूनी',
+    saveMyDetails: 'मेरी जानकारी सेव करें', clearMyDetails: 'मेरी सेव की गई जानकारी हटाएं', fullNameLabel: 'पूरा नाम', mobileNumberLabel: 'मोबाइल नंबर',
+    deliveryAddressLabel: 'डिलीवरी पता', pincodeLabel: 'पिनकोड',
   },
 };
 let currentLang = 'en';
@@ -696,10 +724,10 @@ function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack
                   </div>
                 )}
                 {[
-                  { label: 'My Details', page: 'profile' },
-                  { label: 'My Orders', page: 'my-orders' },
-                  { label: 'About Us & Contact', page: 'about' },
-                  { label: 'FAQs', page: 'faq' },
+                  { label: t('myDetails'), page: 'profile' },
+                  { label: t('myOrders'), page: 'my-orders' },
+                  { label: t('aboutUsContact'), page: 'about' },
+                  { label: t('faqTitle'), page: 'faq' },
                   { label: 'Terms & Conditions', page: 'terms' },
                   { label: 'Privacy Policy', page: 'privacy' },
                 ].map((item) => (
@@ -851,27 +879,27 @@ function LocationModal({ onClose, onConfirm, deliverySettings }) {
     <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: 'rgba(43,32,19,0.45)' }}>
       <div className="w-full rounded-t-3xl p-5" style={{ background: COLORS.card, maxWidth: 448 }}>
         <div className="flex items-center justify-between mb-3">
-          <h2 style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 18, color: COLORS.ink }}>Delivering to your door</h2>
+          <h2 style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 18, color: COLORS.ink }}>{t('deliveringToDoor')}</h2>
           <button onClick={onClose}><X size={20} color={COLORS.inkSoft} /></button>
         </div>
-        <p style={{ fontFamily: bodyFont, fontSize: 12.5, color: COLORS.inkSoft, marginBottom: 14 }}>Enter your 6-digit pincode so we can confirm we deliver to your area.</p>
+        <p style={{ fontFamily: bodyFont, fontSize: 12.5, color: COLORS.inkSoft, marginBottom: 14 }}>{t('enterPincodeHint')}</p>
         <input
           value={pin}
           onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-          placeholder="Enter pincode e.g. 201301"
+          placeholder={t('enterPincodePlaceholder')}
           className="w-full px-4 py-3 rounded-xl mb-3"
           style={{ border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 15, outline: 'none' }}
         />
         {result && result.allowed && (
           <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl mb-3" style={{ background: COLORS.successTint }}>
             <CheckCircle2 size={16} color={COLORS.secondary} />
-            <span style={{ fontFamily: bodyFont, fontSize: 12.5, color: COLORS.secondary, fontWeight: 700 }}>We deliver here{result.area ? ' \u2014 ' + result.area : ''}!</span>
+            <span style={{ fontFamily: bodyFont, fontSize: 12.5, color: COLORS.secondary, fontWeight: 700 }}>{t('weDeliverHere')}{result.area ? ' \u2014 ' + result.area : ''}!</span>
           </div>
         )}
         {result && !result.allowed && (
           <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl mb-3" style={{ background: COLORS.dangerTint }}>
             <AlertCircle size={16} color={COLORS.danger} />
-            <span style={{ fontFamily: bodyFont, fontSize: 12.5, color: COLORS.danger, fontWeight: 700 }}>Sorry, we currently don&rsquo;t deliver to this location.</span>
+            <span style={{ fontFamily: bodyFont, fontSize: 12.5, color: COLORS.danger, fontWeight: 700 }}>{t('noDeliveryHere')}</span>
           </div>
         )}
         <button
@@ -880,9 +908,9 @@ function LocationModal({ onClose, onConfirm, deliverySettings }) {
           className="w-full py-3.5 rounded-xl"
           style={{ background: result && result.allowed ? COLORS.primary : COLORS.border, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 14 }}
         >
-          Confirm location
+          {t('confirmLocation')}
         </button>
-        <button onClick={onClose} className="w-full py-3 text-center" style={{ fontFamily: bodyFont, fontSize: 12, color: COLORS.inkSoft }}>Skip for now, keep browsing</button>
+        <button onClick={onClose} className="w-full py-3 text-center" style={{ fontFamily: bodyFont, fontSize: 12, color: COLORS.inkSoft }}>{t('skipForNow')}</button>
       </div>
     </div>
   );
@@ -907,14 +935,14 @@ function HomePage({ products, nav, onAdd, cart, area, categories, deliverySettin
               <p style={{ fontFamily: bodyFont, fontSize: 13, color: '#fff', opacity: 0.92, marginTop: 4 }}>{deliverySettings.bannerSubtitle}</p>
             )}
             <button onClick={() => nav('category', { id: deliverySettings.bannerCategory })} className="mt-4 px-4 py-2 rounded-full" style={{ background: COLORS.card, color: COLORS.primaryDark, fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>
-              {deliverySettings.bannerCta || 'Shop Now'}
+              {deliverySettings.bannerCta || t('shopNow')}
             </button>
           </div>
           <span className="absolute" style={{ right: -10, bottom: -20, fontSize: 90, opacity: 0.25 }}>{deliverySettings.bannerEmoji}</span>
         </div>
       )}
 
-      <SectionHeader title="Shop by Category" />
+      <SectionHeader title={t('shopByCategory')} />
       <div className="flex gap-4 px-4 mb-6 overflow-x-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         {categories.map((c) => (
           <button key={c.id} onClick={() => nav('category', { id: c.id })} className="flex flex-col items-center gap-1.5 flex-shrink-0" style={{ width: 64 }}>
@@ -926,19 +954,19 @@ function HomePage({ products, nav, onAdd, cart, area, categories, deliverySettin
         ))}
       </div>
 
-      <SectionHeader title="Best Sellers" subtitle="Loved by your neighbours" onSeeAll={() => nav('list', { title: 'Best Sellers', filter: 'bestSeller' })} />
+      <SectionHeader title={t('bestSellers')} subtitle={t('lovedByNeighbours')} onSeeAll={() => nav('list', { title: t('bestSellers'), filter: 'bestSeller' })} />
       <Rail products={bestSellers} onOpen={(p) => nav('product', { id: p.id })} onAdd={onAdd} cart={cart} wishlist={wishlist} onToggleWishlist={onToggleWishlist} />
 
       <div className="mt-6" />
-      <SectionHeader title="New Arrivals" subtitle="Fresh on our shelves" onSeeAll={() => nav('category', { id: 'newarrivals' })} />
+      <SectionHeader title={t('newArrivals')} subtitle={t('freshOnShelves')} onSeeAll={() => nav('category', { id: 'newarrivals' })} />
       <Rail products={newArrivals} onOpen={(p) => nav('product', { id: p.id })} onAdd={onAdd} cart={cart} wishlist={wishlist} onToggleWishlist={onToggleWishlist} />
 
       <div className="mt-6" />
-      <SectionHeader title="Today's Deals" subtitle="Grab them before they're gone" onSeeAll={() => nav('category', { id: 'offers' })} />
+      <SectionHeader title={t('todaysDeals')} subtitle={t('grabBeforeGone')} onSeeAll={() => nav('category', { id: 'offers' })} />
       <Rail products={deals} onOpen={(p) => nav('product', { id: p.id })} onAdd={onAdd} cart={cart} wishlist={wishlist} onToggleWishlist={onToggleWishlist} />
 
       <div className="mt-6" />
-      <SectionHeader title="Recommended for You" />
+      <SectionHeader title={t('recommendedForYou')} />
       <div className="grid grid-cols-2 gap-3 px-4">
         {recommended.map((p) => (
           <ProductCard key={p.id} product={p} onOpen={(pr) => nav('product', { id: pr.id })} onAdd={onAdd} qty={cart[p.id] || 0} isWishlisted={!!(wishlist && wishlist[p.id])} onToggleWishlist={onToggleWishlist} />
@@ -946,7 +974,7 @@ function HomePage({ products, nav, onAdd, cart, area, categories, deliverySettin
       </div>
 
       <button onClick={() => nav('about')} className="w-full mt-7 py-3.5 flex items-center justify-center gap-1.5" style={{ borderTop: `1px solid ${COLORS.border}`, color: COLORS.inkSoft, fontFamily: bodyFont, fontSize: 12, fontWeight: 600 }}>
-        About Us & Contact <ChevronRight size={14} />
+        {t('aboutUsContact')} <ChevronRight size={14} />
       </button>
     </div>
   );
@@ -973,7 +1001,7 @@ function ProductListPage({ products, title, nav, onAdd, cart, wishlist, onToggle
       {!products.length ? (
         <div className="flex flex-col items-center py-16 gap-2">
           <Package size={36} color={COLORS.inkSoft} />
-          <p style={{ fontFamily: bodyFont, color: COLORS.inkSoft, fontSize: 13 }}>No products found.</p>
+          <p style={{ fontFamily: bodyFont, color: COLORS.inkSoft, fontSize: 13 }}>{t('noProductsFound')}</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3">
@@ -990,12 +1018,12 @@ function WishlistPage({ products, wishlist, nav, onAdd, cart, onToggleWishlist }
   const saved = products.filter((p) => wishlist && wishlist[p.id]);
   return (
     <div className="p-4">
-      <h2 style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 18, color: COLORS.ink, marginBottom: 14 }}>My Wishlist</h2>
+      <h2 style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 18, color: COLORS.ink, marginBottom: 14 }}>{t('myWishlist')}</h2>
       {!saved.length ? (
         <div className="flex flex-col items-center py-16 gap-2">
           <Heart size={36} color={COLORS.inkSoft} />
-          <p style={{ fontFamily: bodyFont, color: COLORS.inkSoft, fontSize: 13 }}>Nothing saved yet.</p>
-          <button onClick={() => nav('home')} className="mt-2 px-4 py-2 rounded-full" style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>Browse Products</button>
+          <p style={{ fontFamily: bodyFont, color: COLORS.inkSoft, fontSize: 13 }}>{t('nothingSavedYet')}</p>
+          <button onClick={() => nav('home')} className="mt-2 px-4 py-2 rounded-full" style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>{t('browseProducts')}</button>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3">
@@ -1081,11 +1109,11 @@ function ProductPage({ product, nav, onAdd, onBuyNow, qty, reviews = [], onAddRe
         <div className="flex items-center gap-1 mt-1.5">
           <Star size={13} fill={COLORS.gold} color={COLORS.gold} />
           <span style={{ fontFamily: bodyFont, fontSize: 12.5, color: COLORS.inkSoft }}>
-            {displayRating} rating{productReviews.length > 0 ? ` \u00b7 ${productReviews.length} review${productReviews.length === 1 ? '' : 's'}` : ''}
+            {displayRating} {t('ratingText')}{productReviews.length > 0 ? ` \u00b7 ${productReviews.length} ${t('reviewText')}${productReviews.length === 1 || currentLang !== 'en' ? '' : 's'}` : ''}
           </span>
           <span style={{ color: COLORS.border }}>&bull;</span>
           <span style={{ fontFamily: bodyFont, fontSize: 12.5, color: product.stock === 0 ? COLORS.danger : product.stock <= LOW_STOCK_THRESHOLD ? COLORS.gold : COLORS.secondary, fontWeight: 700 }}>
-            {product.stock === 0 ? 'Out of stock' : product.stock <= LOW_STOCK_THRESHOLD ? `Only ${product.stock} left \u2014 order soon` : `${product.stock} in stock`}
+            {product.stock === 0 ? t('outOfStockLine') : product.stock <= LOW_STOCK_THRESHOLD ? t('onlyLeftOrderSoon', { n: product.stock }) : t('inStockCount', { n: product.stock })}
           </span>
         </div>
         <div className="mt-4"><PriceTag price={product.price} mrp={product.mrp} size="lg" /></div>
@@ -1107,7 +1135,7 @@ function ProductPage({ product, nav, onAdd, onBuyNow, qty, reviews = [], onAddRe
 
         <div className="mt-7">
           <div className="flex items-center justify-between mb-3">
-            <h3 style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 14, color: COLORS.ink }}>Ratings &amp; Reviews</h3>
+            <h3 style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 14, color: COLORS.ink }}>{t('ratingsAndReviews')}</h3>
             {!showForm && (
               <button onClick={() => setShowForm(true)} style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12, color: COLORS.primary }}>
                 {t('writeReview')}
@@ -1117,7 +1145,7 @@ function ProductPage({ product, nav, onAdd, onBuyNow, qty, reviews = [], onAddRe
 
           {showForm && (
             <div className="rounded-2xl p-3.5 mb-4 flex flex-col gap-2.5" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
-              <input value={rName} onChange={(e) => setRName(e.target.value)} placeholder="Your name" className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }} />
+              <input value={rName} onChange={(e) => setRName(e.target.value)} placeholder={t("yourName")} className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }} />
               <div className="flex items-center gap-1">
                 {[1, 2, 3, 4, 5].map((i) => (
                   <button key={i} onClick={() => setRRating(i)}>
@@ -1125,19 +1153,19 @@ function ProductPage({ product, nav, onAdd, onBuyNow, qty, reviews = [], onAddRe
                   </button>
                 ))}
               </div>
-              <textarea value={rComment} onChange={(e) => setRComment(e.target.value)} placeholder="Share your experience with this product" rows={3} className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none', resize: 'none' }} />
+              <textarea value={rComment} onChange={(e) => setRComment(e.target.value)} placeholder={t("shareExperience")} rows={3} className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none', resize: 'none' }} />
               {rError && <p style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.danger }}>{rError}</p>}
               <div className="flex gap-2">
-                <button onClick={() => { setShowForm(false); setRError(''); }} className="flex-1 py-2.5 rounded-lg" style={{ border: `1px solid ${COLORS.border}`, color: COLORS.inkSoft, fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>Cancel</button>
+                <button onClick={() => { setShowForm(false); setRError(''); }} className="flex-1 py-2.5 rounded-lg" style={{ border: `1px solid ${COLORS.border}`, color: COLORS.inkSoft, fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>{t("cancel")}</button>
                 <button onClick={submitReview} disabled={submitting} className="flex-1 py-2.5 rounded-lg" style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, opacity: submitting ? 0.6 : 1 }}>
-                  {submitting ? 'Submitting...' : 'Submit Review'}
+                  {submitting ? '...' : t('submitReview')}
                 </button>
               </div>
             </div>
           )}
 
           {productReviews.length === 0 ? (
-            <p style={{ fontFamily: bodyFont, fontSize: 12.5, color: COLORS.inkSoft }}>No reviews yet &mdash; be the first to share your experience.</p>
+            <p style={{ fontFamily: bodyFont, fontSize: 12.5, color: COLORS.inkSoft }}>{t('noReviewsYet')}</p>
           ) : (
             <div className="flex flex-col gap-3">
               {productReviews.map((r) => (
@@ -1269,7 +1297,7 @@ function CheckoutPage({ cartItems, subtotal, deliverySettings, nav, placeOrder }
     if (!form.name.trim()) return setError(t('enterName'));
     if (!/^\d{10}$/.test(form.mobile)) return setError(t('enterMobile'));
     if (!form.address.trim()) return setError(t('enterAddress'));
-    if (!zone || !zone.allowed) return setError("Sorry, we currently don't deliver to this location.");
+    if (!zone || !zone.allowed) return setError(t("noDeliveryHere"));
     if (belowMin) return setError(`Minimum order value is ${money(deliverySettings.minOrderValue)}.`);
 
     if (payment === 'online' && RAZORPAY_ENABLED) {
@@ -1396,7 +1424,7 @@ function CheckoutPage({ cartItems, subtotal, deliverySettings, nav, placeOrder }
         {zone && !zone.allowed && (
           <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ background: COLORS.dangerTint }}>
             <AlertCircle size={15} color={COLORS.danger} />
-            <span style={{ fontFamily: bodyFont, fontSize: 12, color: COLORS.danger, fontWeight: 700 }}>Sorry, we currently don&rsquo;t deliver to this location.</span>
+            <span style={{ fontFamily: bodyFont, fontSize: 12, color: COLORS.danger, fontWeight: 700 }}>{t("noDeliveryHere")}</span>
           </div>
         )}
       </div>
@@ -1553,14 +1581,14 @@ function AboutPage({ deliverySettings, nav }) {
       </div>
 
       <div>
-        <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 13, color: COLORS.ink, marginBottom: 10 }}>Help</p>
+        <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 13, color: COLORS.ink, marginBottom: 10 }}>{t("help")}</p>
         <div className="flex flex-col gap-2.5">
           <button onClick={() => nav('profile')} className="w-full flex items-center gap-3 rounded-xl p-3.5 text-left" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
             <div className="rounded-full flex items-center justify-center" style={{ width: 36, height: 36, background: `${COLORS.primary}1A` }}>
               <Users size={17} color={COLORS.primary} />
             </div>
             <div className="flex-1">
-              <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>My Details</p>
+              <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>{t("myDetails")}</p>
             </div>
             <ChevronRight size={16} color={COLORS.inkSoft} />
           </button>
@@ -1569,7 +1597,7 @@ function AboutPage({ deliverySettings, nav }) {
               <Package size={17} color={COLORS.secondary} />
             </div>
             <div className="flex-1">
-              <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>My Orders</p>
+              <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>{t("myOrders")}</p>
             </div>
             <ChevronRight size={16} color={COLORS.inkSoft} />
           </button>
@@ -1578,7 +1606,7 @@ function AboutPage({ deliverySettings, nav }) {
               <ClipboardList size={17} color={COLORS.blue} />
             </div>
             <div className="flex-1">
-              <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>Frequently Asked Questions</p>
+              <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>{t("faqTitle")}</p>
             </div>
             <ChevronRight size={16} color={COLORS.inkSoft} />
           </button>
@@ -1586,7 +1614,7 @@ function AboutPage({ deliverySettings, nav }) {
       </div>
 
       <div>
-        <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 13, color: COLORS.ink, marginBottom: 10 }}>Legal</p>
+        <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 13, color: COLORS.ink, marginBottom: 10 }}>{t("legal")}</p>
         <div className="flex flex-col gap-2.5">
           <button onClick={() => nav('terms')} className="flex items-center gap-3 rounded-xl p-3.5 text-left" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
             <div className="rounded-full flex items-center justify-center" style={{ width: 36, height: 36, background: `${COLORS.primary}1A` }}>
@@ -1732,10 +1760,10 @@ function ProfilePage() {
       </label>
 
       <button onClick={save} className="w-full py-3.5 rounded-xl mt-2" style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 14 }}>
-        {saved ? 'Saved \u2713' : 'Save My Details'}
+        {saved ? '\u2713' : t('saveMyDetails')}
       </button>
       <button onClick={clearProfile} className="w-full py-3" style={{ color: COLORS.danger, fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>
-        Clear My Saved Details
+        {t("clearMyDetails")}
       </button>
     </div>
   );
@@ -1786,8 +1814,8 @@ function FAQPage({ deliverySettings }) {
   return (
     <div className="p-4 pb-10 flex flex-col gap-5">
       <div>
-        <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 13, color: COLORS.ink, marginBottom: 4 }}>Frequently Asked Questions</p>
-        <p style={{ fontFamily: bodyFont, fontSize: 12, color: COLORS.inkSoft }}>Quick answers about shopping with {shopName}. Can't find what you need? Reach us on WhatsApp at +{deliverySettings.whatsappNumber}.</p>
+        <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 13, color: COLORS.ink, marginBottom: 4 }}>{t("faqTitle")}</p>
+        <p style={{ fontFamily: bodyFont, fontSize: 12, color: COLORS.inkSoft }}>{t('faqIntro')} {shopName}. {t('cantFind')} +{deliverySettings.whatsappNumber}.</p>
       </div>
 
       <div className="flex flex-col gap-2.5">
@@ -3052,12 +3080,12 @@ export default function App() {
     product: currentProduct?.name,
     checkout: t('checkout'),
     list: listTitle,
-    about: 'About Us & Contact',
+    about: t('aboutUsContact'),
     terms: 'Terms & Conditions',
     privacy: 'Privacy Policy',
-    faq: 'FAQs',
-    profile: 'My Details',
-    'my-orders': 'My Orders',
+    faq: t('faqTitle'),
+    profile: t('myDetails'),
+    'my-orders': t('myOrders'),
   };
 
   if (!loaded) {
