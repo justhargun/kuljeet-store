@@ -595,8 +595,8 @@ function FestiveSparkles({ count = 9 }) {
 function ProductCard({ product, onOpen, onAdd, qty, isWishlisted, onToggleWishlist, size = 'normal' }) {
   const off = pctOff(product.price, product.mrp);
   const big = size === 'large';
-  const cardW = big ? 200 : 158;
-  const imgH = big ? 150 : 110;
+  const cardW = big ? 250 : 158;
+  const imgH = big ? 190 : 110;
   return (
     <div
       className="rounded-2xl overflow-hidden flex flex-col cursor-pointer"
@@ -607,7 +607,7 @@ function ProductCard({ product, onOpen, onAdd, qty, isWishlisted, onToggleWishli
         {product.imageUrl ? (
           <img src={product.imageUrl} alt={product.name} className="w-full h-full" style={{ objectFit: 'cover' }} />
         ) : (
-          <span style={{ fontSize: big ? 48 : 38 }}>{product.emoji}</span>
+          <span style={{ fontSize: big ? 60 : 38 }}>{product.emoji}</span>
         )}
         <div className="absolute top-2 left-2 flex flex-col gap-1 items-start">
           {product.isNew && <Badge bg={COLORS.secondary}>{t('new')}</Badge>}
@@ -630,7 +630,7 @@ function ProductCard({ product, onOpen, onAdd, qty, isWishlisted, onToggleWishli
         )}
       </div>
       <div className="p-2.5 flex flex-col gap-1.5 flex-1">
-        <p style={{ ...clamp2, color: COLORS.ink, fontFamily: bodyFont, fontWeight: 600, fontSize: big ? 13.5 : 12.5, minHeight: big ? 34 : 32 }}>{product.name}</p>
+        <p style={{ ...clamp2, color: COLORS.ink, fontFamily: bodyFont, fontWeight: 600, fontSize: big ? 15.5 : 12.5, minHeight: big ? 40 : 32 }}>{product.name}</p>
         {product.quantity && <span style={{ fontSize: 10.5, color: COLORS.inkSoft, fontFamily: bodyFont }}>{product.quantity}</span>}
         <div className="flex items-center gap-1">
           <Star size={11} fill={COLORS.gold} color={COLORS.gold} />
@@ -642,9 +642,9 @@ function ProductCard({ product, onOpen, onAdd, qty, isWishlisted, onToggleWishli
             onClick={(e) => { e.stopPropagation(); onAdd(product); }}
             disabled={product.stock === 0}
             className="rounded-full flex items-center justify-center"
-            style={{ width: big ? 34 : 30, height: big ? 34 : 30, background: product.stock === 0 ? COLORS.border : COLORS.primary, color: '#fff', flexShrink: 0 }}
+            style={{ width: big ? 40 : 30, height: big ? 40 : 30, background: product.stock === 0 ? COLORS.border : COLORS.primary, color: '#fff', flexShrink: 0 }}
           >
-            <Plus size={big ? 17 : 15} />
+            <Plus size={big ? 20 : 15} />
           </button>
         </div>
         {qty > 0 && <span className="text-center" style={{ fontSize: 10.5, color: COLORS.secondary, fontFamily: bodyFont, fontWeight: 700 }}>{qty} in cart</span>}
