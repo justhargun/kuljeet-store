@@ -326,6 +326,7 @@ function toDbProductPatch(patch) {
   if ('deal' in patch) out.deal = patch.deal;
   if ('name' in patch) out.name = patch.name;
   if ('category' in patch) out.category = patch.category;
+  if ('categories' in patch) out.categories = patch.categories;
   if ('emoji' in patch) out.emoji = patch.emoji;
   if ('desc' in patch) out.description = patch.desc;
   if ('imageUrl' in patch) out.image_url = patch.imageUrl;
@@ -333,11 +334,18 @@ function toDbProductPatch(patch) {
   return out;
 }
 function mapProductFromDb(r) {
+  const categories = Array.isArray(r.categories) && r.categories.length ? r.categories : [r.category];
   return {
-    id: r.id, category: r.category, name: r.name, price: Number(r.price), mrp: Number(r.mrp), stock: r.stock,
+    id: r.id, category: r.category, categories, name: r.name, price: Number(r.price), mrp: Number(r.mrp), stock: r.stock,
     emoji: r.emoji || '\ud83d\udecd\ufe0f', g1: r.g1 || '#F7D9C4', g2: r.g2 || '#F0B499', rating: Number(r.rating) || 4,
     bestSeller: !!r.best_seller, isNew: !!r.is_new, deal: !!r.deal, desc: r.description || '', imageUrl: r.image_url || '', quantity: r.quantity || '',
   };
+}
+// A product is "in" a category if it's the primary category, or listed among
+// its additional categories \u2014 works for both old products (category only)
+// and new ones (category + categories[]).
+function productInCategory(p, categoryId) {
+  return p.category === categoryId || (Array.isArray(p.categories) && p.categories.includes(categoryId));
 }
 function mapReviewFromDb(r) {
   return { id: r.id, productId: r.product_id, name: r.customer_name, rating: Number(r.rating), comment: r.comment || '', createdAt: r.created_at ? new Date(r.created_at).getTime() : Date.now() };
@@ -2263,19 +2271,24 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
   const [deleteError, setDeleteError] = useState('');
   const fileInputRef = useRef(null);
   const [catForm, setCatForm] = useState({ name: '', emoji: '\ud83c\udff7\ufe0f', color: '#D9730D' });
-  const [form, setForm] = useState({ name: '', category: categories[0].id, price: '', mrp: '', stock: '', emoji: '\ud83d\udecd\ufe0f', quantity: '', desc: '', imageUrl: '' });
+  const [form, setForm] = useState({ name: '', category: categories[0].id, categories: [categories[0].id], price: '', mrp: '', stock: '', emoji: '\ud83d\udecd\ufe0f', quantity: '', desc: '', imageUrl: '' });
+  const toggleCat = (setFn, current, id) => {
+    const has = current.includes(id);
+    const next = has ? current.filter((c) => c !== id) : [...current, id];
+    setFn(next.length ? next : [id]); // never allow zero categories
+  };
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState(null);
 
   const startEdit = (p) => {
     setEditingId(p.id);
-    setEditForm({ name: p.name, category: p.category, price: String(p.price), mrp: String(p.mrp), stock: String(p.stock), emoji: p.emoji, quantity: p.quantity || '', desc: p.desc || '', imageUrl: p.imageUrl || '' });
+    setEditForm({ name: p.name, category: p.category, categories: p.categories && p.categories.length ? p.categories : [p.category], price: String(p.price), mrp: String(p.mrp), stock: String(p.stock), emoji: p.emoji, quantity: p.quantity || '', desc: p.desc || '', imageUrl: p.imageUrl || '' });
   };
   const cancelEdit = () => { setEditingId(null); setEditForm(null); };
   const saveEdit = () => {
     if (!editForm.name.trim() || !editForm.price || !editForm.mrp) return;
     update(editingId, {
-      name: editForm.name, category: editForm.category, price: Number(editForm.price) || 0, mrp: Number(editForm.mrp) || 0,
+      name: editForm.name, category: editForm.categories[0], categories: editForm.categories, price: Number(editForm.price) || 0, mrp: Number(editForm.mrp) || 0,
       stock: Number(editForm.stock) || 0, emoji: editForm.emoji || '\ud83d\udecd\ufe0f', quantity: editForm.quantity, desc: editForm.desc, imageUrl: editForm.imageUrl,
     });
     cancelEdit();
@@ -2287,17 +2300,17 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
     catch (err) { console.error('Could not read photo:', err); }
   };
 
-  const CSV_HEADERS = ['name', 'category', 'price', 'mrp', 'stock', 'quantity', 'emoji', 'desc', 'imageUrl'];
+  const CSV_HEADERS = ['name', 'category', 'categories', 'price', 'mrp', 'stock', 'quantity', 'emoji', 'desc', 'imageUrl'];
 
   const downloadSample = () => {
     downloadTextFile('sample-products.csv', toCSV(CSV_HEADERS, [
-      { name: 'Sample Face Wash', category: categories[0].id, price: 199, mrp: 249, stock: 20, emoji: '\ud83e\uddf4', desc: 'A gentle daily face wash.', imageUrl: '' },
+      { name: 'Sample Face Wash', category: categories[0].id, categories: categories.slice(0, 2).map((c) => c.id).join(','), price: 199, mrp: 249, stock: 20, emoji: '\ud83e\uddf4', desc: 'A gentle daily face wash.', imageUrl: '' },
     ]));
   };
 
   const exportProducts = () => {
     downloadTextFile('kuljeet-store-products.csv', toCSV(CSV_HEADERS, products.map((p) => ({
-      name: p.name, category: p.category, price: p.price, mrp: p.mrp, stock: p.stock, quantity: p.quantity || '', emoji: p.emoji, desc: p.desc, imageUrl: p.imageUrl || '',
+      name: p.name, category: p.category, categories: (p.categories || [p.category]).join(','), price: p.price, mrp: p.mrp, stock: p.stock, quantity: p.quantity || '', emoji: p.emoji, desc: p.desc, imageUrl: p.imageUrl || '',
     }))));
   };
 
@@ -2317,8 +2330,10 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
         const obj = {};
         headerRow.forEach((h, i) => { obj[h] = (r[i] || '').trim(); });
         if (!obj.name || !obj.price || !obj.mrp) { skipped++; continue; }
+        const primaryCat = validCatIds.has(obj.category) ? obj.category : categories[0].id;
+        const parsedCats = (obj.categories || '').split(',').map((c) => c.trim()).filter((c) => validCatIds.has(c));
         drafts.push({
-          category: validCatIds.has(obj.category) ? obj.category : categories[0].id,
+          category: primaryCat, categories: parsedCats.length ? parsedCats : [primaryCat],
           name: obj.name, price: Number(obj.price) || 0, mrp: Number(obj.mrp) || 0,
           stock: Number(obj.stock) || 0, quantity: obj.quantity || '', emoji: obj.emoji || '\ud83d\udecd\ufe0f',
           desc: obj.desc || 'A trusted everyday pick from our store shelves.',
@@ -2329,7 +2344,7 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
       if (BACKEND_ENABLED) {
         const rowsToInsert = drafts.map((d, i) => {
           const [g1, g2] = grad(products.length + i);
-          return { category: d.category, name: d.name, price: d.price, mrp: d.mrp, stock: d.stock, quantity: d.quantity || null, emoji: d.emoji, g1, g2, rating: 4.0, best_seller: false, is_new: true, deal: false, description: d.desc, image_url: d.imageUrl || null };
+          return { category: d.category, categories: d.categories, name: d.name, price: d.price, mrp: d.mrp, stock: d.stock, quantity: d.quantity || null, emoji: d.emoji, g1, g2, rating: 4.0, best_seller: false, is_new: true, deal: false, description: d.desc, image_url: d.imageUrl || null };
         });
         const inserted = await sbInsert('products', rowsToInsert);
         setProducts([...products, ...inserted.map(mapProductFromDb)]);
@@ -2394,14 +2409,14 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
     if (!form.name.trim() || !form.price || !form.mrp) return;
     const [g1, g2] = grad(products.length);
     const draft = {
-      category: form.category, name: form.name, price: Number(form.price), mrp: Number(form.mrp),
+      category: form.categories[0], categories: form.categories, name: form.name, price: Number(form.price), mrp: Number(form.mrp),
       stock: Number(form.stock) || 0, emoji: form.emoji || '\ud83d\udecd\ufe0f', quantity: form.quantity || '', rating: 4.0, g1, g2, bestSeller: false, isNew: true, deal: false,
       desc: form.desc || 'A trusted everyday pick from our store shelves.', imageUrl: form.imageUrl || '',
     };
     if (BACKEND_ENABLED) {
       try {
         const rows = await sbInsert('products', [{
-          category: draft.category, name: draft.name, price: draft.price, mrp: draft.mrp, stock: draft.stock,
+          category: draft.category, categories: draft.categories, name: draft.name, price: draft.price, mrp: draft.mrp, stock: draft.stock,
           emoji: draft.emoji, quantity: draft.quantity || null, g1, g2, rating: draft.rating, best_seller: false, is_new: true, deal: false, description: draft.desc,
           image_url: draft.imageUrl || null,
         }]);
@@ -2413,7 +2428,7 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
     } else {
       setProducts([...products, { id: 'p' + Date.now(), ...draft }]);
     }
-    setForm({ name: '', category: categories[0].id, price: '', mrp: '', stock: '', emoji: '\ud83d\udecd\ufe0f', quantity: '', desc: '', imageUrl: '' });
+    setForm({ name: '', category: categories[0].id, categories: [categories[0].id], price: '', mrp: '', stock: '', emoji: '\ud83d\udecd\ufe0f', quantity: '', desc: '', imageUrl: '' });
     setShowAdd(false);
   };
 
@@ -2455,7 +2470,7 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
       {showBulk && (
         <div className="rounded-2xl p-4 mb-4 flex flex-col gap-3" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
           <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft, lineHeight: 1.5 }}>
-            Add many products at once from a spreadsheet, instead of one by one. Columns needed: name, category, price, mrp, stock, emoji, desc, imageUrl (only name, price, mrp are required).
+            Add many products at once from a spreadsheet, instead of one by one. Columns needed: name, category, categories, price, mrp, stock, emoji, desc, imageUrl (only name, price, mrp are required). To put a product in more than one category, list category IDs separated by commas in the "categories" column, e.g. "skincare,offers".
           </p>
           <button onClick={downloadSample} className="py-2.5 rounded-lg" style={{ border: `1px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>
             Download Sample CSV
@@ -2478,9 +2493,19 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
       {showAdd && (
         <div className="rounded-2xl p-4 mb-4 flex flex-col gap-2.5" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
           <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Product name" className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }} />
-          <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5 }}>
-            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+          <div>
+            <span style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft, fontWeight: 700 }}>Categories (tap all that apply)</span>
+            <div className="flex gap-2 mt-1.5 flex-wrap">
+              {categories.map((c) => {
+                const active = form.categories.includes(c.id);
+                return (
+                  <button key={c.id} type="button" onClick={() => toggleCat((next) => setForm({ ...form, categories: next, category: next[0] }), form.categories, c.id)} className="px-3 py-1.5 rounded-full" style={{ background: active ? COLORS.primary : COLORS.card, color: active ? '#fff' : COLORS.ink, border: `1px solid ${active ? COLORS.primary : COLORS.border}`, fontFamily: bodyFont, fontSize: 11.5, fontWeight: 700 }}>
+                    {c.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           <div className="flex gap-2">
             <input value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value.replace(/\D/g, '') })} placeholder="Selling price" className="flex-1 px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 12.5, outline: 'none' }} />
             <input value={form.mrp} onChange={(e) => setForm({ ...form, mrp: e.target.value.replace(/\D/g, '') })} placeholder="MRP" className="flex-1 px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 12.5, outline: 'none' }} />
@@ -2521,9 +2546,19 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
               <div key={p.id} className="rounded-2xl p-4 flex flex-col gap-2.5" style={{ background: COLORS.card, border: `2px solid ${COLORS.primary}` }}>
                 <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>Edit Product</p>
                 <input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} placeholder="Product name" className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }} />
-                <select value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5 }}>
-                  {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
+                <div>
+                  <span style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft, fontWeight: 700 }}>Categories (tap all that apply)</span>
+                  <div className="flex gap-2 mt-1.5 flex-wrap">
+                    {categories.map((c) => {
+                      const active = (editForm.categories || [editForm.category]).includes(c.id);
+                      return (
+                        <button key={c.id} type="button" onClick={() => toggleCat((next) => setEditForm({ ...editForm, categories: next, category: next[0] }), editForm.categories || [editForm.category], c.id)} className="px-3 py-1.5 rounded-full" style={{ background: active ? COLORS.primary : COLORS.card, color: active ? '#fff' : COLORS.ink, border: `1px solid ${active ? COLORS.primary : COLORS.border}`, fontFamily: bodyFont, fontSize: 11.5, fontWeight: 700 }}>
+                          {c.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
                 <div className="flex gap-2">
                   <input value={editForm.price} onChange={(e) => setEditForm({ ...editForm, price: e.target.value.replace(/\D/g, '') })} placeholder="Selling price" className="flex-1 px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 12.5, outline: 'none' }} />
                   <input value={editForm.mrp} onChange={(e) => setEditForm({ ...editForm, mrp: e.target.value.replace(/\D/g, '') })} placeholder="MRP" className="flex-1 px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 12.5, outline: 'none' }} />
@@ -3176,7 +3211,7 @@ export default function App() {
   const filteredForSearch = useMemo(() => {
     if (!query.trim()) return [];
     const q = query.toLowerCase();
-    return products.filter((p) => p.name.toLowerCase().includes(q) || allCategories.find((c) => c.id === p.category)?.name.toLowerCase().includes(q));
+    return products.filter((p) => p.name.toLowerCase().includes(q) || (p.categories || [p.category]).some((cid) => allCategories.find((c) => c.id === cid)?.name.toLowerCase().includes(q)));
   }, [query, products, allCategories]);
 
   const runSearch = () => { if (query.trim()) nav('list', { title: `Results for "${query}"`, filter: 'search' }); };
@@ -3186,7 +3221,7 @@ export default function App() {
     const cat = allCategories.find((c) => c.id === route.params.id);
     if (cat?.virtual === 'isNew') categoryProducts = products.filter((p) => p.isNew);
     else if (cat?.virtual === 'deal') categoryProducts = products.filter((p) => p.deal || p.mrp > p.price);
-    else categoryProducts = products.filter((p) => p.category === route.params.id);
+    else categoryProducts = products.filter((p) => productInCategory(p, route.params.id));
   }
 
   let listProducts = [];
