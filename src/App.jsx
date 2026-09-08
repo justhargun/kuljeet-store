@@ -1062,6 +1062,7 @@ function ProductPage({ product, nav, onAdd, onBuyNow, qty, reviews = [], onAddRe
   const [rComment, setRComment] = useState('');
   const [rError, setRError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [showFullImage, setShowFullImage] = useState(false);
   if (!product) return null;
   const off = pctOff(product.price, product.mrp);
 
@@ -1088,7 +1089,7 @@ function ProductPage({ product, nav, onAdd, onBuyNow, qty, reviews = [], onAddRe
     <div className="pb-32">
       <div className="relative flex items-center justify-center" style={{ height: 240, background: product.imageUrl ? '#fff' : `linear-gradient(135deg, ${product.g1}, ${product.g2})` }}>
         {product.imageUrl ? (
-          <img src={product.imageUrl} alt={product.name} className="w-full h-full" style={{ objectFit: 'cover' }} />
+          <img src={product.imageUrl} alt={product.name} className="w-full h-full" style={{ objectFit: 'cover', cursor: 'zoom-in' }} onClick={() => setShowFullImage(true)} />
         ) : (
           <span style={{ fontSize: 96 }}>{product.emoji}</span>
         )}
@@ -1117,6 +1118,20 @@ function ProductPage({ product, nav, onAdd, onBuyNow, qty, reviews = [], onAddRe
           <Share2 size={17} color={COLORS.inkSoft} />
         </button>
       </div>
+
+      {showFullImage && product.imageUrl && (
+        <div
+          className="fixed inset-0 flex items-center justify-center"
+          style={{ background: 'rgba(0,0,0,0.92)', zIndex: 9999 }}
+          onClick={() => setShowFullImage(false)}
+        >
+          <button onClick={() => setShowFullImage(false)} className="absolute top-4 right-4 flex items-center justify-center rounded-full" style={{ width: 40, height: 40, background: 'rgba(255,255,255,0.15)' }}>
+            <X size={22} color="#fff" />
+          </button>
+          <img src={product.imageUrl} alt={product.name} className="w-full" style={{ maxHeight: '85vh', objectFit: 'contain' }} onClick={(e) => e.stopPropagation()} />
+        </div>
+      )}
+
       <div className="p-4">
         <div className="flex items-center gap-2 mb-2">
           {product.isNew && <Badge bg={COLORS.secondary}>{t('new')}</Badge>}
