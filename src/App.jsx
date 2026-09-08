@@ -324,6 +324,7 @@ function toDbProductPatch(patch) {
   if ('bestSeller' in patch) out.best_seller = patch.bestSeller;
   if ('isNew' in patch) out.is_new = patch.isNew;
   if ('deal' in patch) out.deal = patch.deal;
+  if ('featured' in patch) out.featured = patch.featured;
   if ('name' in patch) out.name = patch.name;
   if ('category' in patch) out.category = patch.category;
   if ('categories' in patch) out.categories = patch.categories;
@@ -338,7 +339,7 @@ function mapProductFromDb(r) {
   return {
     id: r.id, category: r.category, categories, name: r.name, price: Number(r.price), mrp: Number(r.mrp), stock: r.stock,
     emoji: r.emoji || '\ud83d\udecd\ufe0f', g1: r.g1 || '#F7D9C4', g2: r.g2 || '#F0B499', rating: Number(r.rating) || 4,
-    bestSeller: !!r.best_seller, isNew: !!r.is_new, deal: !!r.deal, desc: r.description || '', imageUrl: r.image_url || '', quantity: r.quantity || '',
+    bestSeller: !!r.best_seller, isNew: !!r.is_new, deal: !!r.deal, featured: !!r.featured, desc: r.description || '', imageUrl: r.image_url || '', quantity: r.quantity || '',
   };
 }
 // A product is "in" a category if it's the primary category, or listed among
@@ -414,6 +415,7 @@ function mapDeliveryFromDb(row, pinRows) {
     upiId: row.upi_id || '',
     openTime: row.open_time || '09:00',
     closeTime: row.close_time || '21:00',
+    manuallyClosed: !!row.manually_closed,
     productsSeeded: !!row.products_seeded,
     adminPassword: row.admin_password || 'admin123',
     bannerEnabled: !!row.banner_enabled,
@@ -488,6 +490,7 @@ const SEED_DELIVERY = {
   upiId: '8433355769@nyes',
   openTime: '09:00',
   closeTime: '21:00',
+  manuallyClosed: false,
   productsSeeded: false,
   bannerEnabled: false,
   bannerTitle: '',
@@ -527,6 +530,7 @@ function formatTime12(t) {
   return `${h12}:${String(m).padStart(2, '0')} ${period}`;
 }
 function isShopOpen(settings) {
+  if (settings.manuallyClosed) return false;
   if (!settings.openTime || !settings.closeTime) return true;
   const [oh, om] = settings.openTime.split(':').map(Number);
   const [ch, cm] = settings.closeTime.split(':').map(Number);
@@ -547,11 +551,11 @@ function PriceTag({ price, mrp, size = 'md' }) {
   return (
     <div
       className="inline-flex flex-col items-start rounded"
-      style={{ background: COLORS.ink, color: COLORS.cream, fontFamily: monoFont, padding: big ? '8px 12px' : '5px 9px', transform: 'rotate(-2deg)' }}
+      style={{ background: '#241C10', color: '#FFFFFF', fontFamily: monoFont, padding: big ? '8px 12px' : '5px 9px', transform: 'rotate(-2deg)' }}
     >
-      <span style={{ fontWeight: 700, fontSize: big ? 22 : 15, lineHeight: 1 }}>{money(price)}</span>
+      <span style={{ fontWeight: 700, fontSize: big ? 22 : 15, lineHeight: 1, color: '#FFFFFF' }}>{money(price)}</span>
       {off > 0 && (
-        <span style={{ fontSize: big ? 12 : 10, color: '#E8C878', marginTop: 3 }}>
+        <span style={{ fontSize: big ? 12 : 10, color: '#FFFFFF', marginTop: 3 }}>
           MRP {money(mrp)} &middot; {off}% off
         </span>
       )}
@@ -669,6 +673,57 @@ function SectionHeader({ title, subtitle, onSeeAll }) {
   );
 }
 
+function CategorySlider({ categories, products, nav }) {
+  const realCats = categories.filter((c) => !c.virtual);
+  return (
+    <div
+      className="flex gap-4 overflow-x-auto px-4 pb-2"
+      style={{ scrollbarWidth: 'none', scrollSnapType: 'x mandatory', scrollPadding: '0 16px' }}
+    >
+      <style>{`
+        .cat-slide-card { transition: transform 0.15s ease, box-shadow 0.15s ease; scroll-snap-align: center; }
+        .cat-slide-card:active { transform: scale(0.96); }
+      `}</style>
+      {realCats.map((c) => {
+        const preview = products.filter((p) => productInCategory(p, c.id)).slice(0, 3);
+        const count = products.filter((p) => productInCategory(p, c.id)).length;
+        return (
+          <div
+            key={c.id}
+            onClick={() => nav('category', { id: c.id })}
+            className="cat-slide-card rounded-3xl overflow-hidden flex-shrink-0 cursor-pointer flex flex-col"
+            style={{ width: 230, minHeight: 260, background: COLORS.card, border: `1px solid ${COLORS.border}`, boxShadow: '0 6px 18px rgba(0,0,0,0.06)' }}
+          >
+            <div className="flex items-center gap-3 p-4" style={{ background: `${c.color}1A` }}>
+              <div className="rounded-2xl flex items-center justify-center flex-shrink-0" style={{ width: 48, height: 48, background: c.color }}>
+                <c.Icon size={24} color="#fff" />
+              </div>
+              <div className="min-w-0">
+                <p style={{ ...clamp1, fontFamily: bodyFont, fontWeight: 700, fontSize: 15, color: COLORS.ink }}>{c.name}</p>
+                <p style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft, marginTop: 2 }}>{count} product{count === 1 ? '' : 's'}</p>
+              </div>
+            </div>
+            <div className="flex-1 flex gap-2 p-3">
+              {preview.length ? preview.map((p) => (
+                <div key={p.id} className="flex-1 rounded-xl overflow-hidden flex items-center justify-center" style={{ background: p.imageUrl ? '#fff' : `linear-gradient(135deg, ${p.g1}, ${p.g2})`, border: `1px solid ${COLORS.border}`, minHeight: 90 }}>
+                  {p.imageUrl ? <img src={p.imageUrl} alt={p.name} className="w-full h-full" style={{ objectFit: 'cover' }} /> : <span style={{ fontSize: 30 }}>{p.emoji}</span>}
+                </div>
+              )) : (
+                <div className="flex-1 flex items-center justify-center" style={{ minHeight: 90 }}>
+                  <p style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft }}>No products yet</p>
+                </div>
+              )}
+            </div>
+            <div className="px-4 pb-4">
+              <span style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12, color: c.color }}>Browse {c.name} &rarr;</span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function Rail({ products, onOpen, onAdd, cart, wishlist, onToggleWishlist, size = 'normal' }) {
   if (!products.length) return <p className="px-4 text-sm" style={{ color: COLORS.inkSoft, fontFamily: bodyFont }}>Nothing here yet.</p>;
   return (
@@ -702,14 +757,14 @@ function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack
 
   if (title) {
     return (
-      <div className="sticky top-0 z-20 flex items-center gap-3 px-4 py-3" style={{ background: '#FFF3B0', borderBottom: `1px solid ${COLORS.border}` }}>
+      <div className="sticky top-0 z-20 flex items-center gap-3 px-4 py-3" style={{ background: theme === 'dark' ? COLORS.bg : '#FFF3B0', borderBottom: `1px solid ${COLORS.border}` }}>
         <button onClick={onBack}><ArrowLeft size={20} color={COLORS.ink} /></button>
         <h1 style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 17, color: COLORS.ink }}>{title}</h1>
       </div>
     );
   }
   return (
-    <div className="sticky top-0 z-20" style={{ background: '#FFF3B0', borderBottom: `1px solid ${COLORS.border}` }}>
+    <div className="sticky top-0 z-20" style={{ background: theme === 'dark' ? COLORS.bg : '#FFF3B0', borderBottom: `1px solid ${COLORS.border}` }}>
       <div className="flex items-center justify-between px-4 pt-3">
         <div className="flex items-center gap-2">
           <div className="rounded-xl flex items-center justify-center" style={{ width: 36, height: 36, background: '#FFC93C' }}>
@@ -740,6 +795,7 @@ function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack
                 {[
                   { label: t('myDetails'), page: 'profile' },
                   { label: t('myOrders'), page: 'my-orders' },
+                  { label: '\ud83c\udfae Play a Game', page: 'game' },
                   { label: t('aboutUsContact'), page: 'about' },
                   { label: t('faqTitle'), page: 'faq' },
                   { label: 'Terms & Conditions', page: 'terms' },
@@ -968,9 +1024,12 @@ function HomePage({ products, nav, onAdd, cart, area, categories, deliverySettin
         ))}
       </div>
 
-      <SectionHeader title="Featured Products" subtitle="Handpicked picks worth a closer look" />
-      <Rail products={[...products].sort((a, b) => b.rating - a.rating).slice(0, 10)} onOpen={(p) => nav('product', { id: p.id })} onAdd={onAdd} cart={cart} wishlist={wishlist} onToggleWishlist={onToggleWishlist} size="large" />
-
+      {products.some((p) => p.featured) && (
+        <>
+          <SectionHeader title="Featured Products" subtitle="Handpicked picks worth a closer look" />
+          <Rail products={products.filter((p) => p.featured)} onOpen={(p) => nav('product', { id: p.id })} onAdd={onAdd} cart={cart} wishlist={wishlist} onToggleWishlist={onToggleWishlist} size="large" />
+        </>
+      )}
       <div className="mt-6" />
       <SectionHeader title={t('bestSellers')} subtitle={t('lovedByNeighbours')} onSeeAll={() => nav('list', { title: t('bestSellers'), filter: 'bestSeller' })} />
       <Rail products={bestSellers} onOpen={(p) => nav('product', { id: p.id })} onAdd={onAdd} cart={cart} wishlist={wishlist} onToggleWishlist={onToggleWishlist} />
@@ -1244,14 +1303,20 @@ function ProductPage({ product, nav, onAdd, onBuyNow, qty, reviews = [], onAddRe
   );
 }
 
-function CartPage({ cartItems, updateQty, removeItem, subtotal, nav }) {
+function CartPage({ cartItems, updateQty, removeItem, subtotal, nav, products = [], onAdd, cart = {}, wishlist, onToggleWishlist }) {
   if (!cartItems.length) {
+    const deals = products.filter((p) => p.deal || p.mrp > p.price);
     return (
       <div className="flex flex-col items-center py-20 gap-3 px-6">
         <ShoppingCart size={40} color={COLORS.inkSoft} />
         <p style={{ fontFamily: bodyFont, color: COLORS.ink, fontWeight: 700, fontSize: 14 }}>{t('emptyCart')}</p>
         <p style={{ fontFamily: bodyFont, color: COLORS.inkSoft, fontSize: 12, textAlign: 'center' }}>Explore our categories and add items you love.</p>
         <button onClick={() => nav('categories')} className="px-5 py-2.5 rounded-full mt-1" style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>Browse Categories</button>
+        {!!deals.length && (
+          <div className="w-full mt-6">
+            <Rail products={deals} onOpen={(p) => nav('product', { id: p.id })} onAdd={onAdd} cart={cart} wishlist={wishlist} onToggleWishlist={onToggleWishlist} />
+          </div>
+        )}
       </div>
     );
   }
@@ -1694,6 +1759,201 @@ function LegalSection({ heading, children }) {
     <div>
       <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 13, color: COLORS.ink, marginBottom: 6 }}>{heading}</p>
       <div style={{ fontFamily: bodyFont, fontSize: 12.5, color: COLORS.inkSoft, lineHeight: 1.65 }}>{children}</div>
+    </div>
+  );
+}
+
+function GamePage() {
+  const GOOD_EMOJIS = ['\ud83e\uddf4', '\ud83e\udee7', '\ud83d\udc84', '\ud83e\udd6b', '\ud83e\uddc8', '\ud83c\udf39', '\ud83e\udea5', '\ud83e\uddfc'];
+  const BAD_EMOJIS = ['\ud83d\udca3', '\ud83e\udea8'];
+  const WIDTH = 100; // percent-based play field
+  const [items, setItems] = useState([]);
+  const [basketX, setBasketX] = useState(50);
+  const [score, setScore] = useState(0);
+  const [lives, setLives] = useState(3);
+  const [running, setRunning] = useState(false);
+  const [gameOver, setGameOver] = useState(false);
+  const [highScore, setHighScore] = useState(0);
+  const fieldRef = useRef(null);
+  const draggingRef = useRef(false);
+  const pendingXRef = useRef(null);
+  const rafIdRef = useRef(null);
+  const basketXRef = useRef(50);
+  useEffect(() => { basketXRef.current = basketX; }, [basketX]);
+  const nextId = useRef(0);
+  const spawnTimer = useRef(0);
+
+  // Prevent the whole page from scrolling/bouncing while this screen is
+  // open, so only the game field itself responds to touch \u2014 not the
+  // page behind it.
+  useEffect(() => {
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevBodyOverscroll = document.body.style.overscrollBehavior;
+    const prevHtmlOverscroll = document.documentElement.style.overscrollBehavior;
+    document.body.style.overflow = 'hidden';
+    document.body.style.overscrollBehavior = 'none';
+    document.documentElement.style.overscrollBehavior = 'none';
+    return () => {
+      document.body.style.overflow = prevBodyOverflow;
+      document.body.style.overscrollBehavior = prevBodyOverscroll;
+      document.documentElement.style.overscrollBehavior = prevHtmlOverscroll;
+    };
+  }, []);
+
+  useEffect(() => {
+    window.storage.get('mm-game-highscore').then((r) => {
+      if (r && r.value) setHighScore(Number(r.value) || 0);
+    }).catch(() => {});
+  }, []);
+
+  const startGame = () => {
+    setItems([]);
+    setScore(0);
+    setLives(3);
+    setGameOver(false);
+    setBasketX(50);
+    spawnTimer.current = 0;
+    setRunning(true);
+  };
+
+  useEffect(() => {
+    if (!running) return;
+    const interval = setInterval(() => {
+      spawnTimer.current += 1;
+      setItems((prev) => {
+        let next = prev.map((it) => ({ ...it, y: it.y + it.speed }));
+        // spawn a new item roughly every ~1.1s
+        if (spawnTimer.current % 11 === 0) {
+          const isBad = Math.random() < 0.28;
+          next = [...next, {
+            id: nextId.current++,
+            x: 8 + Math.random() * 84,
+            y: 0,
+            speed: 2.2 + Math.random() * 1.6,
+            emoji: isBad ? BAD_EMOJIS[Math.floor(Math.random() * BAD_EMOJIS.length)] : GOOD_EMOJIS[Math.floor(Math.random() * GOOD_EMOJIS.length)],
+            isBad,
+          }];
+        }
+        // check catches at the basket line (~88%)
+        const survivors = [];
+        let scoreDelta = 0;
+        let lifeDelta = 0;
+        for (const it of next) {
+          if (it.y >= 84 && it.y <= 94 && Math.abs(it.x - basketXRef.current) < 11) {
+            if (it.isBad) lifeDelta -= 1; else scoreDelta += 1;
+            continue; // caught, remove
+          }
+          if (it.y > 100) {
+            if (!it.isBad) lifeDelta -= 0; // missing a good one is fine, no penalty
+            continue; // fell off screen, remove
+          }
+          survivors.push(it);
+        }
+        if (scoreDelta) setScore((s) => s + scoreDelta);
+        if (lifeDelta) setLives((l) => Math.max(0, l + lifeDelta));
+        return survivors;
+      });
+    }, 90);
+    return () => clearInterval(interval);
+  }, [running]);
+
+  useEffect(() => {
+    if (running && lives <= 0) {
+      setRunning(false);
+      setGameOver(true);
+      setScore((s) => {
+        if (s > highScore) {
+          setHighScore(s);
+          window.storage.set('mm-game-highscore', String(s)).catch(() => {});
+        }
+        return s;
+      });
+    }
+  }, [lives, running, highScore]);
+
+  const moveBasket = (clientX) => {
+    if (!fieldRef.current) return;
+    const rect = fieldRef.current.getBoundingClientRect();
+    const pct = ((clientX - rect.left) / rect.width) * 100;
+    setBasketX(Math.max(6, Math.min(94, pct)));
+  };
+  // Touch/pointer-move events can fire many times per frame, and calling
+  // moveBasket (a state update + re-render) on every single one competes
+  // with the game loop for the main thread, visibly slowing the falling
+  // items down while dragging. This batches it to once per frame instead.
+  const scheduleMove = (clientX) => {
+    pendingXRef.current = clientX;
+    if (rafIdRef.current) return;
+    rafIdRef.current = requestAnimationFrame(() => {
+      rafIdRef.current = null;
+      if (pendingXRef.current != null) moveBasket(pendingXRef.current);
+    });
+  };
+  useEffect(() => () => { if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current); }, []);
+
+  return (
+    <div className="p-4 pb-10 flex flex-col items-center gap-4">
+      <p style={{ fontFamily: bodyFont, fontSize: 12, color: COLORS.inkSoft, textAlign: 'center' }}>
+        Drag left/right to move the basket and catch the products. Avoid the bombs! Just for fun \u2014 no prizes here.
+      </p>
+
+      <div className="flex items-center gap-5">
+        <div className="flex items-center gap-1.5">
+          <Star size={15} fill={COLORS.gold} color={COLORS.gold} />
+          <span style={{ fontFamily: monoFont, fontWeight: 700, fontSize: 16, color: COLORS.ink }}>{score}</span>
+        </div>
+        <div className="flex items-center gap-1">
+          {[0, 1, 2].map((i) => (
+            <Heart key={i} size={16} fill={i < lives ? COLORS.danger : 'none'} color={i < lives ? COLORS.danger : COLORS.border} />
+          ))}
+        </div>
+        <span style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft }}>Best: {highScore}</span>
+      </div>
+
+      <div
+        ref={fieldRef}
+        className="relative w-full rounded-2xl overflow-hidden"
+        style={{
+          height: 380, background: `linear-gradient(180deg, ${COLORS.cream}, ${COLORS.bg})`, border: `1px solid ${COLORS.border}`,
+          touchAction: 'none', overscrollBehavior: 'contain', userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none',
+        }}
+        onPointerDown={(e) => {
+          if (!running) return;
+          draggingRef.current = true;
+          try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+          scheduleMove(e.clientX);
+        }}
+        onPointerMove={(e) => {
+          if (!running || !draggingRef.current) return;
+          scheduleMove(e.clientX);
+        }}
+        onPointerUp={() => { draggingRef.current = false; }}
+        onPointerCancel={() => { draggingRef.current = false; }}
+      >
+        {items.map((it) => (
+          <span key={it.id} className="absolute" style={{ left: `${it.x}%`, top: `${it.y}%`, transform: 'translate(-50%, -50%)', fontSize: 28, pointerEvents: 'none', userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' }}>
+            {it.emoji}
+          </span>
+        ))}
+        {running && (
+          <span className="absolute" style={{ left: `${basketX}%`, top: '90%', transform: 'translate(-50%, -50%)', fontSize: 40, pointerEvents: 'none', userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' }}>
+            &#128722;
+          </span>
+        )}
+        {!running && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3" style={{ background: 'rgba(0,0,0,0.35)' }}>
+            {gameOver && (
+              <>
+                <p style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 22, color: '#fff' }}>Game Over</p>
+                <p style={{ fontFamily: bodyFont, fontSize: 13, color: '#fff' }}>You scored {score}{score >= highScore && score > 0 ? ' \u2014 new best!' : ''}</p>
+              </>
+            )}
+            <button onClick={startGame} className="px-6 py-3 rounded-full" style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 13.5 }}>
+              {gameOver ? 'Play Again' : 'Start Game'}
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -2425,14 +2685,14 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
     const [g1, g2] = grad(products.length);
     const draft = {
       category: form.categories[0], categories: form.categories, name: form.name, price: Number(form.price), mrp: Number(form.mrp),
-      stock: Number(form.stock) || 0, emoji: form.emoji || '\ud83d\udecd\ufe0f', quantity: form.quantity || '', rating: 4.0, g1, g2, bestSeller: false, isNew: true, deal: false,
+      stock: Number(form.stock) || 0, emoji: form.emoji || '\ud83d\udecd\ufe0f', quantity: form.quantity || '', rating: 4.0, g1, g2, bestSeller: false, isNew: true, deal: false, featured: false,
       desc: form.desc || 'A trusted everyday pick from our store shelves.', imageUrl: form.imageUrl || '',
     };
     if (BACKEND_ENABLED) {
       try {
         const rows = await sbInsert('products', [{
           category: draft.category, categories: draft.categories, name: draft.name, price: draft.price, mrp: draft.mrp, stock: draft.stock,
-          emoji: draft.emoji, quantity: draft.quantity || null, g1, g2, rating: draft.rating, best_seller: false, is_new: true, deal: false, description: draft.desc,
+          emoji: draft.emoji, quantity: draft.quantity || null, g1, g2, rating: draft.rating, best_seller: false, is_new: true, deal: false, featured: false, description: draft.desc,
           image_url: draft.imageUrl || null,
         }]);
         setProducts([...products, mapProductFromDb(rows[0])]);
@@ -2630,6 +2890,7 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
                   <label className="flex items-center gap-1"><input type="checkbox" checked={p.bestSeller} onChange={(e) => update(p.id, { bestSeller: e.target.checked })} /><span style={{ fontSize: 10, fontFamily: bodyFont, color: COLORS.inkSoft }}>Bestseller</span></label>
                   <label className="flex items-center gap-1"><input type="checkbox" checked={p.isNew} onChange={(e) => update(p.id, { isNew: e.target.checked })} /><span style={{ fontSize: 10, fontFamily: bodyFont, color: COLORS.inkSoft }}>New</span></label>
                   <label className="flex items-center gap-1"><input type="checkbox" checked={p.deal} onChange={(e) => update(p.id, { deal: e.target.checked })} /><span style={{ fontSize: 10, fontFamily: bodyFont, color: COLORS.inkSoft }}>Deal</span></label>
+                  <label className="flex items-center gap-1"><input type="checkbox" checked={p.featured} onChange={(e) => update(p.id, { featured: e.target.checked })} /><span style={{ fontSize: 10, fontFamily: bodyFont, color: COLORS.inkSoft }}>Featured</span></label>
                   <span style={{ fontSize: 10, fontFamily: bodyFont, color: COLORS.gold, fontWeight: 700 }}>{off > 0 ? off + '% off' : ''}</span>
                 </div>
               </div>
@@ -2655,7 +2916,7 @@ function AdminDelivery({ settings, setSettings, categories }) {
         shop_name: local.shopName, shop_area: local.shopArea, shop_pincode: local.shopPincode, mode: local.mode, gst_number: local.gstNumber || null, maps_link: local.mapsLink || null,
         radius_km: local.radiusKm, min_order_value: local.minOrderValue, delivery_charge: local.deliveryCharge,
         free_delivery_threshold: local.freeDeliveryThreshold, whatsapp_number: local.whatsappNumber, upi_id: local.upiId,
-        open_time: local.openTime, close_time: local.closeTime,
+        open_time: local.openTime, close_time: local.closeTime, manually_closed: local.manuallyClosed,
         banner_enabled: local.bannerEnabled, banner_title: local.bannerTitle, banner_subtitle: local.bannerSubtitle,
         banner_cta: local.bannerCta, banner_category: local.bannerCategory, banner_emoji: local.bannerEmoji,
         banner_color1: local.bannerColor1, banner_color2: local.bannerColor2,
@@ -2667,6 +2928,14 @@ function AdminDelivery({ settings, setSettings, categories }) {
       const removed = settings.pincodes.filter((p) => !nextPins.has(p.pincode));
       if (added.length) sbInsert('delivery_pincodes', added).catch((e) => console.error('Pincode add failed to sync:', e));
       removed.forEach((p) => sbDelete('delivery_pincodes', `pincode=eq.${p.pincode}`).catch((e) => console.error('Pincode delete failed to sync:', e)));
+    }
+  };
+  const toggleShopOpen = () => {
+    const next = { ...local, manuallyClosed: !local.manuallyClosed };
+    setLocal(next);
+    setSettings(next);
+    if (BACKEND_ENABLED) {
+      sbUpdate('delivery_settings', 'id=eq.1', { manually_closed: next.manuallyClosed }).catch((e) => console.error('Could not sync open/closed status:', e));
     }
   };
   const addPin = () => {
@@ -2736,6 +3005,21 @@ function AdminDelivery({ settings, setSettings, categories }) {
 
       <div className="rounded-2xl p-4 flex flex-col gap-3" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
         <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>Store Timings</p>
+
+        <div className="flex items-center justify-between rounded-xl p-3.5" style={{ background: local.manuallyClosed ? COLORS.dangerTint : COLORS.successTint }}>
+          <div>
+            <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 13, color: local.manuallyClosed ? COLORS.danger : COLORS.secondary }}>
+              {local.manuallyClosed ? 'Shop is manually closed' : 'Shop is open'}
+            </p>
+            <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft, marginTop: 2 }}>
+              {local.manuallyClosed ? 'Overrides your scheduled hours below \u2014 no new orders can be placed.' : 'Following your scheduled hours below.'}
+            </p>
+          </div>
+          <button onClick={toggleShopOpen} className="px-4 py-2 rounded-full flex-shrink-0" style={{ background: local.manuallyClosed ? COLORS.secondary : COLORS.danger, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 12 }}>
+            {local.manuallyClosed ? 'Reopen Shop' : 'Close Shop'}
+          </button>
+        </div>
+
         <div className="flex gap-3">
           <label className="flex-1 flex flex-col gap-1">
             <span style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft, fontWeight: 700 }}>Opens at</span>
@@ -3251,7 +3535,7 @@ export default function App() {
 
   const isAdminRoute = route.page === 'admin';
   const showHeader = !isAdminRoute && route.page !== 'product' && route.page !== 'checkout';
-  const showBackHeader = route.page === 'category' || route.page === 'product' || route.page === 'checkout' || route.page === 'list' || route.page === 'about' || route.page === 'terms' || route.page === 'privacy' || route.page === 'faq' || route.page === 'profile' || route.page === 'my-orders';
+  const showBackHeader = route.page === 'category' || route.page === 'product' || route.page === 'checkout' || route.page === 'list' || route.page === 'about' || route.page === 'terms' || route.page === 'privacy' || route.page === 'faq' || route.page === 'profile' || route.page === 'my-orders' || route.page === 'game';
 
   const headerTitleMap = {
     category: allCategories.find((c) => c.id === route.params.id)?.name,
@@ -3264,11 +3548,12 @@ export default function App() {
     faq: t('faqTitle'),
     profile: t('myDetails'),
     'my-orders': t('myOrders'),
+    game: 'Catch the Products',
   };
 
   if (!loaded) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: '#FFF3B0' }}>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: theme === 'dark' ? COLORS.bg : '#FFF3B0' }}>
         <p style={{ fontFamily: displayFont, fontStyle: 'italic', fontSize: 18, color: COLORS.primary }}>Loading Kuljeet Store&hellip;</p>
       </div>
     );
@@ -3276,8 +3561,8 @@ export default function App() {
 
   return (
     <>
-    <div className="min-h-screen flex justify-center app-shell" style={{ background: 'linear-gradient(180deg, #FFF3B0 0%, #FBF6EC 600px)', fontFamily: bodyFont }}>
-      <div className="w-full flex flex-col" style={{ maxWidth: 448, minHeight: '100vh', background: 'linear-gradient(180deg, #FFF3B0 0%, #FBF6EC 600px)', boxShadow: '0 0 40px rgba(0,0,0,0.06)' }}>
+    <div className="min-h-screen flex justify-center app-shell" style={{ background: theme === 'dark' ? COLORS.bg : 'linear-gradient(180deg, #FFF3B0 0%, #FBF6EC 600px)', fontFamily: bodyFont }}>
+      <div className="w-full flex flex-col" style={{ maxWidth: 448, minHeight: '100vh', background: theme === 'dark' ? COLORS.bg : 'linear-gradient(180deg, #FFF3B0 0%, #FBF6EC 600px)', boxShadow: '0 0 40px rgba(0,0,0,0.06)' }}>
         {showLocationModal && !isAdminRoute && (
           <LocationModal
             deliverySettings={deliverySettings}
@@ -3304,7 +3589,7 @@ export default function App() {
           {route.page === 'category' && <ProductListPage products={categoryProducts} nav={nav} onAdd={addToCart} cart={cart} wishlist={wishlist} onToggleWishlist={toggleWishlist} />}
           {route.page === 'list' && <ProductListPage products={listProducts} nav={nav} onAdd={addToCart} cart={cart} wishlist={wishlist} onToggleWishlist={toggleWishlist} />}
           {route.page === 'product' && <ProductPage product={currentProduct} nav={nav} onAdd={addToCart} onBuyNow={buyNow} qty={currentProduct ? (cart[currentProduct.id] || 0) : 0} />}
-          {route.page === 'cart' && <CartPage cartItems={cartItems} updateQty={updateQty} removeItem={removeItem} subtotal={subtotal} nav={nav} />}
+          {route.page === 'cart' && <CartPage cartItems={cartItems} updateQty={updateQty} removeItem={removeItem} subtotal={subtotal} nav={nav} products={products} onAdd={addToCart} cart={cart} wishlist={wishlist} onToggleWishlist={toggleWishlist} />}
           {route.page === 'checkout' && (
             cartItems.length
               ? <CheckoutPage cartItems={cartItems} subtotal={subtotal} deliverySettings={deliverySettings} nav={nav} placeOrder={placeOrder} />
@@ -3313,6 +3598,7 @@ export default function App() {
           {route.page === 'about' && <AboutPage deliverySettings={deliverySettings} nav={nav} />}
           {route.page === 'profile' && <ProfilePage />}
           {route.page === 'my-orders' && <MyOrdersPage deliverySettings={deliverySettings} />}
+          {route.page === 'game' && <GamePage />}
           {route.page === 'faq' && <FAQPage deliverySettings={deliverySettings} />}
           {route.page === 'terms' && <TermsPage deliverySettings={deliverySettings} />}
           {route.page === 'privacy' && <PrivacyPage deliverySettings={deliverySettings} />}
