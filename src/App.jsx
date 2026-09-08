@@ -5,7 +5,7 @@ import {
   Wind, Heart, Palette, Baby, Sun, Tag, Lock, Truck, CreditCard, Banknote,
   MessageCircle, Trash2, PlusCircle, BarChart3, Users,
   ClipboardList, AlertCircle, CheckCircle2, ArrowLeft,
-  LogOut, Flower, ShoppingBasket, Smartphone, ImagePlus, KeyRound, Moon, FileText, ShieldCheck, Share2, MoreVertical
+  LogOut, Flower, ShoppingBasket, Smartphone, ImagePlus, KeyRound, Moon, FileText, ShieldCheck, Share2, MoreVertical, Pencil
 } from 'lucide-react';
 
 if (typeof window !== 'undefined' && !window.storage) {
@@ -44,18 +44,18 @@ if (typeof window !== 'undefined' && !window.storage) {
 
 /* ---------------------------------- THEME ---------------------------------- */
 const LIGHT_THEME = {
-  bg: '#FBF6EC',
+  bg: '#FFE9CC',
   card: '#FFFFFF',
   ink: '#2B2013',
   inkSoft: '#8A7B65',
-  border: '#ECE0C8',
+  border: '#F5D8AC',
   primary: '#D9730D',
   primaryDark: '#B45A05',
   secondary: '#0E6E5C',
   rose: '#B23A5C',
   gold: '#C89116',
   danger: '#C1443A',
-  cream: '#FFF9EE',
+  cream: '#FFDDAA',
   purple: '#6B4A9E',
   blue: '#3E7FB0',
   dangerTint: '#FBEAE8',
@@ -329,13 +329,14 @@ function toDbProductPatch(patch) {
   if ('emoji' in patch) out.emoji = patch.emoji;
   if ('desc' in patch) out.description = patch.desc;
   if ('imageUrl' in patch) out.image_url = patch.imageUrl;
+  if ('quantity' in patch) out.quantity = patch.quantity;
   return out;
 }
 function mapProductFromDb(r) {
   return {
     id: r.id, category: r.category, name: r.name, price: Number(r.price), mrp: Number(r.mrp), stock: r.stock,
     emoji: r.emoji || '\ud83d\udecd\ufe0f', g1: r.g1 || '#F7D9C4', g2: r.g2 || '#F0B499', rating: Number(r.rating) || 4,
-    bestSeller: !!r.best_seller, isNew: !!r.is_new, deal: !!r.deal, desc: r.description || '', imageUrl: r.image_url || '',
+    bestSeller: !!r.best_seller, isNew: !!r.is_new, deal: !!r.deal, desc: r.description || '', imageUrl: r.image_url || '', quantity: r.quantity || '',
   };
 }
 function mapReviewFromDb(r) {
@@ -399,7 +400,7 @@ function readImageAsDataUrl(file) {
 }
 function mapDeliveryFromDb(row, pinRows) {
   return {
-    shopName: row.shop_name, shopArea: row.shop_area, shopPincode: row.shop_pincode, mode: row.mode, gstNumber: row.gst_number || '',
+    shopName: row.shop_name, shopArea: row.shop_area, shopPincode: row.shop_pincode, mode: row.mode, gstNumber: row.gst_number || '', mapsLink: row.maps_link || '',
     radiusKm: Number(row.radius_km), minOrderValue: Number(row.min_order_value), deliveryCharge: Number(row.delivery_charge),
     freeDeliveryThreshold: Number(row.free_delivery_threshold), whatsappNumber: row.whatsapp_number,
     upiId: row.upi_id || '',
@@ -459,9 +460,10 @@ const grad = (i) => GRADIENTS[i % GRADIENTS.length];
 /* ---------------------------------- DELIVERY -------------------------------- */
 const SEED_DELIVERY = {
   shopName: 'Kuljeet Store',
-  shopArea: 'Hargaon, Sitapur',
+  shopArea: 'Kuljeet Store, Ganj\nHargaon (Sitapur)\nU.P. 261121',
   shopPincode: '261121',
   gstNumber: '',
+  mapsLink: '',
   mode: 'radius',
   pincodes: [
     { pincode: '201301', area: 'Sector 62, Noida' },
@@ -582,19 +584,22 @@ function FestiveSparkles({ count = 9 }) {
   );
 }
 
-function ProductCard({ product, onOpen, onAdd, qty, isWishlisted, onToggleWishlist }) {
+function ProductCard({ product, onOpen, onAdd, qty, isWishlisted, onToggleWishlist, size = 'normal' }) {
   const off = pctOff(product.price, product.mrp);
+  const big = size === 'large';
+  const cardW = big ? 200 : 158;
+  const imgH = big ? 150 : 110;
   return (
     <div
       className="rounded-2xl overflow-hidden flex flex-col cursor-pointer"
-      style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, minWidth: 158, width: 158 }}
+      style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, minWidth: cardW, width: cardW }}
       onClick={() => onOpen(product)}
     >
-      <div className="relative flex items-center justify-center" style={{ height: 110, background: product.imageUrl ? '#fff' : `linear-gradient(135deg, ${product.g1}, ${product.g2})` }}>
+      <div className="relative flex items-center justify-center" style={{ height: imgH, background: product.imageUrl ? '#fff' : `linear-gradient(135deg, ${product.g1}, ${product.g2})` }}>
         {product.imageUrl ? (
           <img src={product.imageUrl} alt={product.name} className="w-full h-full" style={{ objectFit: 'cover' }} />
         ) : (
-          <span style={{ fontSize: 38 }}>{product.emoji}</span>
+          <span style={{ fontSize: big ? 48 : 38 }}>{product.emoji}</span>
         )}
         <div className="absolute top-2 left-2 flex flex-col gap-1 items-start">
           {product.isNew && <Badge bg={COLORS.secondary}>{t('new')}</Badge>}
@@ -617,7 +622,8 @@ function ProductCard({ product, onOpen, onAdd, qty, isWishlisted, onToggleWishli
         )}
       </div>
       <div className="p-2.5 flex flex-col gap-1.5 flex-1">
-        <p style={{ ...clamp2, color: COLORS.ink, fontFamily: bodyFont, fontWeight: 600, fontSize: 12.5, minHeight: 32 }}>{product.name}</p>
+        <p style={{ ...clamp2, color: COLORS.ink, fontFamily: bodyFont, fontWeight: 600, fontSize: big ? 13.5 : 12.5, minHeight: big ? 34 : 32 }}>{product.name}</p>
+        {product.quantity && <span style={{ fontSize: 10.5, color: COLORS.inkSoft, fontFamily: bodyFont }}>{product.quantity}</span>}
         <div className="flex items-center gap-1">
           <Star size={11} fill={COLORS.gold} color={COLORS.gold} />
           <span style={{ fontSize: 11, color: COLORS.inkSoft, fontFamily: bodyFont }}>{product.rating}</span>
@@ -628,9 +634,9 @@ function ProductCard({ product, onOpen, onAdd, qty, isWishlisted, onToggleWishli
             onClick={(e) => { e.stopPropagation(); onAdd(product); }}
             disabled={product.stock === 0}
             className="rounded-full flex items-center justify-center"
-            style={{ width: 30, height: 30, background: product.stock === 0 ? COLORS.border : COLORS.primary, color: '#fff', flexShrink: 0 }}
+            style={{ width: big ? 34 : 30, height: big ? 34 : 30, background: product.stock === 0 ? COLORS.border : COLORS.primary, color: '#fff', flexShrink: 0 }}
           >
-            <Plus size={15} />
+            <Plus size={big ? 17 : 15} />
           </button>
         </div>
         {qty > 0 && <span className="text-center" style={{ fontSize: 10.5, color: COLORS.secondary, fontFamily: bodyFont, fontWeight: 700 }}>{qty} in cart</span>}
@@ -655,12 +661,12 @@ function SectionHeader({ title, subtitle, onSeeAll }) {
   );
 }
 
-function Rail({ products, onOpen, onAdd, cart, wishlist, onToggleWishlist }) {
+function Rail({ products, onOpen, onAdd, cart, wishlist, onToggleWishlist, size = 'normal' }) {
   if (!products.length) return <p className="px-4 text-sm" style={{ color: COLORS.inkSoft, fontFamily: bodyFont }}>Nothing here yet.</p>;
   return (
     <div className="flex gap-3 overflow-x-auto px-4 pb-1" style={{ scrollbarWidth: 'none' }}>
       {products.map((p) => (
-        <ProductCard key={p.id} product={p} onOpen={onOpen} onAdd={onAdd} qty={cart[p.id] || 0} isWishlisted={!!(wishlist && wishlist[p.id])} onToggleWishlist={onToggleWishlist} />
+        <ProductCard key={p.id} product={p} onOpen={onOpen} onAdd={onAdd} qty={cart[p.id] || 0} isWishlisted={!!(wishlist && wishlist[p.id])} onToggleWishlist={onToggleWishlist} size={size} />
       ))}
     </div>
   );
@@ -688,18 +694,18 @@ function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack
 
   if (title) {
     return (
-      <div className="sticky top-0 z-20 flex items-center gap-3 px-4 py-3" style={{ background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}` }}>
+      <div className="sticky top-0 z-20 flex items-center gap-3 px-4 py-3" style={{ background: '#FFF3B0', borderBottom: `1px solid ${COLORS.border}` }}>
         <button onClick={onBack}><ArrowLeft size={20} color={COLORS.ink} /></button>
         <h1 style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 17, color: COLORS.ink }}>{title}</h1>
       </div>
     );
   }
   return (
-    <div className="sticky top-0 z-20" style={{ background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}` }}>
+    <div className="sticky top-0 z-20" style={{ background: '#FFF3B0', borderBottom: `1px solid ${COLORS.border}` }}>
       <div className="flex items-center justify-between px-4 pt-3">
         <div className="flex items-center gap-2">
-          <div className="rounded-xl flex items-center justify-center" style={{ width: 36, height: 36, background: COLORS.primary }}>
-            <span style={{ fontSize: 18 }}>&#127978;</span>
+          <div className="rounded-xl flex items-center justify-center" style={{ width: 36, height: 36, background: '#FFC93C' }}>
+            <span style={{ fontSize: 24 }}>&#127978;</span>
           </div>
           <div>
             <h1 style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 18, color: COLORS.ink, lineHeight: 1 }}>{shopName}</h1>
@@ -954,6 +960,10 @@ function HomePage({ products, nav, onAdd, cart, area, categories, deliverySettin
         ))}
       </div>
 
+      <SectionHeader title="Featured Products" subtitle="Handpicked picks worth a closer look" />
+      <Rail products={[...products].sort((a, b) => b.rating - a.rating).slice(0, 10)} onOpen={(p) => nav('product', { id: p.id })} onAdd={onAdd} cart={cart} wishlist={wishlist} onToggleWishlist={onToggleWishlist} size="large" />
+
+      <div className="mt-6" />
       <SectionHeader title={t('bestSellers')} subtitle={t('lovedByNeighbours')} onSeeAll={() => nav('list', { title: t('bestSellers'), filter: 'bestSeller' })} />
       <Rail products={bestSellers} onOpen={(p) => nav('product', { id: p.id })} onAdd={onAdd} cart={cart} wishlist={wishlist} onToggleWishlist={onToggleWishlist} />
 
@@ -1106,6 +1116,7 @@ function ProductPage({ product, nav, onAdd, onBuyNow, qty, reviews = [], onAddRe
           {product.bestSeller && <Badge bg={COLORS.gold}>{t('bestseller')}</Badge>}
         </div>
         <h1 style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 21, color: COLORS.ink }}>{product.name}</h1>
+        {product.quantity && <p style={{ fontFamily: bodyFont, fontSize: 12.5, color: COLORS.inkSoft, marginTop: 2 }}>{product.quantity}</p>}
         <div className="flex items-center gap-1 mt-1.5">
           <Star size={13} fill={COLORS.gold} color={COLORS.gold} />
           <span style={{ fontFamily: bodyFont, fontSize: 12.5, color: COLORS.inkSoft }}>
@@ -1537,6 +1548,20 @@ function AboutPage({ deliverySettings, nav }) {
             <ChevronRight size={16} color={COLORS.inkSoft} />
           </a>
         </div>
+      </div>
+
+      <div>
+        <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 13, color: COLORS.ink, marginBottom: 10 }}>Visit Us</p>
+        <a href={deliverySettings.mapsLink || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(deliverySettings.shopArea)}`} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-xl p-3.5" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+          <div className="rounded-full flex items-center justify-center flex-shrink-0" style={{ width: 36, height: 36, background: `${COLORS.rose}1A` }}>
+            <MapPin size={17} color={COLORS.rose} />
+          </div>
+          <div className="flex-1">
+            <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink, whiteSpace: 'pre-line', lineHeight: 1.5 }}>{deliverySettings.shopArea}</p>
+            <p style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft, marginTop: 4 }}>Get Directions</p>
+          </div>
+          <ChevronRight size={16} color={COLORS.inkSoft} />
+        </a>
       </div>
 
       <div>
@@ -2077,7 +2102,7 @@ function InvoiceOverlay({ order, deliverySettings, onClose }) {
           <div className="flex justify-between items-start mb-6">
             <div>
               <p style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 20 }}>{deliverySettings.shopName}</p>
-              <p style={{ fontFamily: bodyFont, fontSize: 11, color: '#666', marginTop: 2 }}>{deliverySettings.shopArea}</p>
+              <p style={{ fontFamily: bodyFont, fontSize: 11, color: '#666', marginTop: 2, whiteSpace: 'pre-line' }}>{deliverySettings.shopArea}</p>
               {gst && <p style={{ fontFamily: monoFont, fontSize: 10.5, color: '#666', marginTop: 2 }}>GSTIN: {gst}</p>}
             </div>
             <div className="text-right">
@@ -2235,11 +2260,34 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
   const [showCats, setShowCats] = useState(false);
   const [showBulk, setShowBulk] = useState(false);
   const [importMsg, setImportMsg] = useState('');
+  const [deleteError, setDeleteError] = useState('');
   const fileInputRef = useRef(null);
   const [catForm, setCatForm] = useState({ name: '', emoji: '\ud83c\udff7\ufe0f', color: '#D9730D' });
-  const [form, setForm] = useState({ name: '', category: categories[0].id, price: '', mrp: '', stock: '', emoji: '\ud83d\udecd\ufe0f', desc: '', imageUrl: '' });
+  const [form, setForm] = useState({ name: '', category: categories[0].id, price: '', mrp: '', stock: '', emoji: '\ud83d\udecd\ufe0f', quantity: '', desc: '', imageUrl: '' });
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState(null);
 
-  const CSV_HEADERS = ['name', 'category', 'price', 'mrp', 'stock', 'emoji', 'desc', 'imageUrl'];
+  const startEdit = (p) => {
+    setEditingId(p.id);
+    setEditForm({ name: p.name, category: p.category, price: String(p.price), mrp: String(p.mrp), stock: String(p.stock), emoji: p.emoji, quantity: p.quantity || '', desc: p.desc || '', imageUrl: p.imageUrl || '' });
+  };
+  const cancelEdit = () => { setEditingId(null); setEditForm(null); };
+  const saveEdit = () => {
+    if (!editForm.name.trim() || !editForm.price || !editForm.mrp) return;
+    update(editingId, {
+      name: editForm.name, category: editForm.category, price: Number(editForm.price) || 0, mrp: Number(editForm.mrp) || 0,
+      stock: Number(editForm.stock) || 0, emoji: editForm.emoji || '\ud83d\udecd\ufe0f', quantity: editForm.quantity, desc: editForm.desc, imageUrl: editForm.imageUrl,
+    });
+    cancelEdit();
+  };
+  const handleEditPhoto = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    try { const dataUrl = await readImageAsDataUrl(file); setEditForm((f) => ({ ...f, imageUrl: dataUrl })); }
+    catch (err) { console.error('Could not read photo:', err); }
+  };
+
+  const CSV_HEADERS = ['name', 'category', 'price', 'mrp', 'stock', 'quantity', 'emoji', 'desc', 'imageUrl'];
 
   const downloadSample = () => {
     downloadTextFile('sample-products.csv', toCSV(CSV_HEADERS, [
@@ -2249,7 +2297,7 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
 
   const exportProducts = () => {
     downloadTextFile('kuljeet-store-products.csv', toCSV(CSV_HEADERS, products.map((p) => ({
-      name: p.name, category: p.category, price: p.price, mrp: p.mrp, stock: p.stock, emoji: p.emoji, desc: p.desc, imageUrl: p.imageUrl || '',
+      name: p.name, category: p.category, price: p.price, mrp: p.mrp, stock: p.stock, quantity: p.quantity || '', emoji: p.emoji, desc: p.desc, imageUrl: p.imageUrl || '',
     }))));
   };
 
@@ -2272,7 +2320,7 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
         drafts.push({
           category: validCatIds.has(obj.category) ? obj.category : categories[0].id,
           name: obj.name, price: Number(obj.price) || 0, mrp: Number(obj.mrp) || 0,
-          stock: Number(obj.stock) || 0, emoji: obj.emoji || '\ud83d\udecd\ufe0f',
+          stock: Number(obj.stock) || 0, quantity: obj.quantity || '', emoji: obj.emoji || '\ud83d\udecd\ufe0f',
           desc: obj.desc || 'A trusted everyday pick from our store shelves.',
           imageUrl: obj.imageurl || '',
         });
@@ -2281,7 +2329,7 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
       if (BACKEND_ENABLED) {
         const rowsToInsert = drafts.map((d, i) => {
           const [g1, g2] = grad(products.length + i);
-          return { category: d.category, name: d.name, price: d.price, mrp: d.mrp, stock: d.stock, emoji: d.emoji, g1, g2, rating: 4.0, best_seller: false, is_new: true, deal: false, description: d.desc, image_url: d.imageUrl || null };
+          return { category: d.category, name: d.name, price: d.price, mrp: d.mrp, stock: d.stock, quantity: d.quantity || null, emoji: d.emoji, g1, g2, rating: 4.0, best_seller: false, is_new: true, deal: false, description: d.desc, image_url: d.imageUrl || null };
         });
         const inserted = await sbInsert('products', rowsToInsert);
         setProducts([...products, ...inserted.map(mapProductFromDb)]);
@@ -2317,8 +2365,18 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
     if (BACKEND_ENABLED) sbUpdate('products', `id=eq.${id}`, toDbProductPatch(patch)).catch((e) => console.error('Product update failed to sync:', e));
   };
   const remove = (id) => {
+    const removedProduct = products.find((p) => p.id === id);
     setProducts(products.filter((p) => p.id !== id));
-    if (BACKEND_ENABLED) sbDelete('products', `id=eq.${id}`).catch((e) => console.error('Product delete failed to sync:', e));
+    setDeleteError('');
+    if (BACKEND_ENABLED) {
+      sbDelete('products', `id=eq.${id}`).catch((e) => {
+        console.error('Product delete failed to sync:', e);
+        // The delete didn't actually happen on the server, so put the
+        // product back rather than letting it silently reappear later.
+        setProducts((current) => (current.some((p) => p.id === id) ? current : [...current, removedProduct]));
+        setDeleteError(`Couldn't delete "${removedProduct.name}" \u2014 please check your connection and try again.`);
+      });
+    }
   };
   const handleNewPhoto = async (e) => {
     const file = e.target.files && e.target.files[0];
@@ -2337,14 +2395,14 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
     const [g1, g2] = grad(products.length);
     const draft = {
       category: form.category, name: form.name, price: Number(form.price), mrp: Number(form.mrp),
-      stock: Number(form.stock) || 0, emoji: form.emoji || '\ud83d\udecd\ufe0f', rating: 4.0, g1, g2, bestSeller: false, isNew: true, deal: false,
+      stock: Number(form.stock) || 0, emoji: form.emoji || '\ud83d\udecd\ufe0f', quantity: form.quantity || '', rating: 4.0, g1, g2, bestSeller: false, isNew: true, deal: false,
       desc: form.desc || 'A trusted everyday pick from our store shelves.', imageUrl: form.imageUrl || '',
     };
     if (BACKEND_ENABLED) {
       try {
         const rows = await sbInsert('products', [{
           category: draft.category, name: draft.name, price: draft.price, mrp: draft.mrp, stock: draft.stock,
-          emoji: draft.emoji, g1, g2, rating: draft.rating, best_seller: false, is_new: true, deal: false, description: draft.desc,
+          emoji: draft.emoji, quantity: draft.quantity || null, g1, g2, rating: draft.rating, best_seller: false, is_new: true, deal: false, description: draft.desc,
           image_url: draft.imageUrl || null,
         }]);
         setProducts([...products, mapProductFromDb(rows[0])]);
@@ -2355,7 +2413,7 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
     } else {
       setProducts([...products, { id: 'p' + Date.now(), ...draft }]);
     }
-    setForm({ name: '', category: categories[0].id, price: '', mrp: '', stock: '', emoji: '\ud83d\udecd\ufe0f', desc: '', imageUrl: '' });
+    setForm({ name: '', category: categories[0].id, price: '', mrp: '', stock: '', emoji: '\ud83d\udecd\ufe0f', quantity: '', desc: '', imageUrl: '' });
     setShowAdd(false);
   };
 
@@ -2431,6 +2489,7 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
             <input value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value.replace(/\D/g, '') })} placeholder="Stock quantity" className="flex-1 px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 12.5, outline: 'none' }} />
             <input value={form.emoji} onChange={(e) => setForm({ ...form, emoji: e.target.value })} placeholder="Icon (emoji)" className="w-24 px-3 py-2.5 rounded-lg text-center" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontSize: 15, outline: 'none' }} />
           </div>
+          <input value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} placeholder="Pack size, e.g. 200ml, 500g, 1kg" className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }} />
           <textarea value={form.desc} onChange={(e) => setForm({ ...form, desc: e.target.value })} placeholder="Description" rows={2} className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none', resize: 'none' }} />
           <div className="flex items-center gap-3">
             <div className="rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0" style={{ width: 56, height: 56, background: COLORS.cream, border: `1px solid ${COLORS.border}` }}>
@@ -2446,9 +2505,51 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
         </div>
       )}
 
+      {deleteError && (
+        <div className="rounded-xl p-3 mb-3 flex items-center gap-2" style={{ background: COLORS.dangerTint }}>
+          <AlertCircle size={15} color={COLORS.danger} />
+          <p style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.danger, flex: 1 }}>{deleteError}</p>
+          <button onClick={() => setDeleteError('')}><X size={14} color={COLORS.danger} /></button>
+        </div>
+      )}
+
       <div className="flex flex-col gap-3">
         {products.map((p) => {
           const off = pctOff(Number(p.price), Number(p.mrp));
+          if (editingId === p.id) {
+            return (
+              <div key={p.id} className="rounded-2xl p-4 flex flex-col gap-2.5" style={{ background: COLORS.card, border: `2px solid ${COLORS.primary}` }}>
+                <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>Edit Product</p>
+                <input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} placeholder="Product name" className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }} />
+                <select value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5 }}>
+                  {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+                <div className="flex gap-2">
+                  <input value={editForm.price} onChange={(e) => setEditForm({ ...editForm, price: e.target.value.replace(/\D/g, '') })} placeholder="Selling price" className="flex-1 px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 12.5, outline: 'none' }} />
+                  <input value={editForm.mrp} onChange={(e) => setEditForm({ ...editForm, mrp: e.target.value.replace(/\D/g, '') })} placeholder="MRP" className="flex-1 px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 12.5, outline: 'none' }} />
+                </div>
+                <div className="flex gap-2">
+                  <input value={editForm.stock} onChange={(e) => setEditForm({ ...editForm, stock: e.target.value.replace(/\D/g, '') })} placeholder="Stock quantity" className="flex-1 px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 12.5, outline: 'none' }} />
+                  <input value={editForm.emoji} onChange={(e) => setEditForm({ ...editForm, emoji: e.target.value })} placeholder="Icon (emoji)" className="w-24 px-3 py-2.5 rounded-lg text-center" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontSize: 15, outline: 'none' }} />
+                </div>
+                <input value={editForm.quantity} onChange={(e) => setEditForm({ ...editForm, quantity: e.target.value })} placeholder="Pack size, e.g. 200ml, 500g, 1kg" className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }} />
+                <textarea value={editForm.desc} onChange={(e) => setEditForm({ ...editForm, desc: e.target.value })} placeholder="Description" rows={2} className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none', resize: 'none' }} />
+                <div className="flex items-center gap-3">
+                  <div className="rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0" style={{ width: 56, height: 56, background: COLORS.cream, border: `1px solid ${COLORS.border}` }}>
+                    {editForm.imageUrl ? <img src={editForm.imageUrl} alt="preview" className="w-full h-full" style={{ objectFit: 'cover' }} /> : <span style={{ fontSize: 20 }}>{editForm.emoji}</span>}
+                  </div>
+                  <label className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg cursor-pointer" style={{ border: `1px dashed ${COLORS.primary}`, color: COLORS.primaryDark }}>
+                    <ImagePlus size={15} /> <span style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12 }}>{editForm.imageUrl ? 'Change Photo' : 'Add Photo'}</span>
+                    <input type="file" accept="image/*" onChange={handleEditPhoto} className="hidden" />
+                  </label>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={saveEdit} className="flex-1 py-2.5 rounded-lg" style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>Save Changes</button>
+                  <button onClick={cancelEdit} className="flex-1 py-2.5 rounded-lg" style={{ border: `1px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>Cancel</button>
+                </div>
+              </div>
+            );
+          }
           return (
             <div key={p.id} className="rounded-2xl p-3 flex gap-3" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
               <div className="flex flex-col items-center gap-1 flex-shrink-0">
@@ -2461,7 +2562,7 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
                 </label>
               </div>
               <div className="flex-1 min-w-0">
-                <p style={{ ...clamp1, fontFamily: bodyFont, fontWeight: 700, fontSize: 12, color: COLORS.ink }}>{p.name}</p>
+                <p style={{ ...clamp1, fontFamily: bodyFont, fontWeight: 700, fontSize: 12, color: COLORS.ink }}>{p.name}{p.quantity ? ` \u00b7 ${p.quantity}` : ''}</p>
                 <div className="flex gap-2 mt-2 flex-wrap">
                   <label className="flex items-center gap-1"><span style={{ fontSize: 10, color: COLORS.inkSoft, fontFamily: bodyFont }}>Price</span>
                     <input type="text" value={p.price} onChange={(e) => update(p.id, { price: Number(e.target.value.replace(/\D/g, '')) || 0 })} className="w-16 px-1.5 py-1 rounded" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 11 }} />
@@ -2482,7 +2583,10 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
                   <span style={{ fontSize: 10, fontFamily: bodyFont, color: COLORS.gold, fontWeight: 700 }}>{off > 0 ? off + '% off' : ''}</span>
                 </div>
               </div>
-              <button onClick={() => remove(p.id)}><Trash2 size={16} color={COLORS.danger} /></button>
+              <div className="flex flex-col gap-2 flex-shrink-0">
+                <button onClick={() => startEdit(p)}><Pencil size={16} color={COLORS.primaryDark} /></button>
+                <button onClick={() => remove(p.id)}><Trash2 size={16} color={COLORS.danger} /></button>
+              </div>
             </div>
           );
         })}
@@ -2498,7 +2602,7 @@ function AdminDelivery({ settings, setSettings, categories }) {
     setSettings(local);
     if (BACKEND_ENABLED) {
       sbUpdate('delivery_settings', 'id=eq.1', {
-        shop_name: local.shopName, shop_area: local.shopArea, shop_pincode: local.shopPincode, mode: local.mode, gst_number: local.gstNumber || null,
+        shop_name: local.shopName, shop_area: local.shopArea, shop_pincode: local.shopPincode, mode: local.mode, gst_number: local.gstNumber || null, maps_link: local.mapsLink || null,
         radius_km: local.radiusKm, min_order_value: local.minOrderValue, delivery_charge: local.deliveryCharge,
         free_delivery_threshold: local.freeDeliveryThreshold, whatsapp_number: local.whatsappNumber, upi_id: local.upiId,
         open_time: local.openTime, close_time: local.closeTime,
@@ -2534,7 +2638,17 @@ function AdminDelivery({ settings, setSettings, categories }) {
       <div className="rounded-2xl p-4 flex flex-col gap-3" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
         <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>Shop Details</p>
         {field('Shop name', local.shopName, (e) => setLocal({ ...local, shopName: e.target.value }))}
-        {field('Shop area', local.shopArea, (e) => setLocal({ ...local, shopArea: e.target.value }))}
+        <label className="flex flex-col gap-1">
+          <span style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft, fontWeight: 700 }}>Store address (shown on About page &amp; invoices)</span>
+          <textarea value={local.shopArea} onChange={(e) => setLocal({ ...local, shopArea: e.target.value })} rows={4} className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none', resize: 'none' }} />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft, fontWeight: 700 }}>Google Maps link (optional, for precise directions)</span>
+          <input value={local.mapsLink} onChange={(e) => setLocal({ ...local, mapsLink: e.target.value.trim() })} placeholder="https://maps.app.goo.gl/..." className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 12, outline: 'none' }} />
+          <p style={{ fontFamily: bodyFont, fontSize: 10, color: COLORS.inkSoft, marginTop: 2, lineHeight: 1.5 }}>
+            Open Google Maps on your phone \u2192 search for or drop a pin exactly on your shop \u2192 tap Share \u2192 Copy link \u2192 paste it here. This makes "Get Directions" go straight to your exact door, since text addresses alone aren\u2019t always precise enough.
+          </p>
+        </label>
         {field('Shop pincode', local.shopPincode, (e) => setLocal({ ...local, shopPincode: e.target.value.replace(/\D/g, '').slice(0, 6) }), true)}
         {field('GST number (optional, shown on invoices)', local.gstNumber, (e) => setLocal({ ...local, gstNumber: e.target.value.toUpperCase() }))}
         {field('WhatsApp number (with country code, no +)', local.whatsappNumber, (e) => setLocal({ ...local, whatsappNumber: e.target.value.replace(/\D/g, '') }), true)}
@@ -2931,6 +3045,20 @@ export default function App() {
     } catch (e) { /* ignore malformed URL */ }
   }, [loaded, products]);
 
+  const pageLinkHandled = useRef(false);
+  useEffect(() => {
+    if (!loaded || pageLinkHandled.current) return;
+    pageLinkHandled.current = true;
+    try {
+      const page = new URLSearchParams(window.location.search).get('page');
+      const allowed = ['privacy', 'terms', 'faq', 'about'];
+      if (page && allowed.includes(page)) {
+        setShowLocationModal(false);
+        setRoute({ page, params: {} });
+      }
+    } catch (e) { /* ignore malformed URL */ }
+  }, [loaded]);
+
   useEffect(() => { if (loaded && !BACKEND_ENABLED) window.storage.set('mm-products', JSON.stringify(products)).catch(() => {}); }, [products, loaded]);
   useEffect(() => { if (loaded && !BACKEND_ENABLED) window.storage.set('mm-delivery', JSON.stringify(deliverySettings)).catch(() => {}); }, [deliverySettings, loaded]);
   useEffect(() => { if (loaded) window.storage.set('mm-cart', JSON.stringify(cart)).catch(() => {}); }, [cart, loaded]);
@@ -3090,7 +3218,7 @@ export default function App() {
 
   if (!loaded) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: COLORS.bg }}>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#FFF3B0' }}>
         <p style={{ fontFamily: displayFont, fontStyle: 'italic', fontSize: 18, color: COLORS.primary }}>Loading Kuljeet Store&hellip;</p>
       </div>
     );
@@ -3098,8 +3226,8 @@ export default function App() {
 
   return (
     <>
-    <div className="min-h-screen flex justify-center app-shell" style={{ background: COLORS.bg, fontFamily: bodyFont }}>
-      <div className="w-full flex flex-col" style={{ maxWidth: 448, minHeight: '100vh', background: COLORS.bg, boxShadow: '0 0 40px rgba(0,0,0,0.06)' }}>
+    <div className="min-h-screen flex justify-center app-shell" style={{ background: 'linear-gradient(180deg, #FFF3B0 0%, #FBF6EC 600px)', fontFamily: bodyFont }}>
+      <div className="w-full flex flex-col" style={{ maxWidth: 448, minHeight: '100vh', background: 'linear-gradient(180deg, #FFF3B0 0%, #FBF6EC 600px)', boxShadow: '0 0 40px rgba(0,0,0,0.06)' }}>
         {showLocationModal && !isAdminRoute && (
           <LocationModal
             deliverySettings={deliverySettings}
