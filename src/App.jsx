@@ -551,11 +551,11 @@ function PriceTag({ price, mrp, size = 'md' }) {
   return (
     <div
       className="inline-flex flex-col items-start rounded"
-      style={{ background: COLORS.primary, color: '#FFFFFF', fontFamily: monoFont, padding: big ? '8px 12px' : '5px 9px', transform: 'rotate(-2deg)' }}
+      style={{ background: '#FFFFFF', color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, padding: big ? '8px 12px' : '5px 9px', transform: 'rotate(-2deg)' }}
     >
-      <span style={{ fontWeight: 700, fontSize: big ? 22 : 15, lineHeight: 1, color: '#FFFFFF' }}>{money(price)}</span>
+      <span style={{ fontWeight: 700, fontSize: big ? 22 : 15, lineHeight: 1, color: COLORS.ink }}>{money(price)}</span>
       {off > 0 && (
-        <span style={{ fontSize: big ? 12 : 10, color: '#FFFFFF', marginTop: 3 }}>
+        <span style={{ fontSize: big ? 12 : 10, color: COLORS.inkSoft, marginTop: 3 }}>
           MRP {money(mrp)} &middot; {off}% off
         </span>
       )}
@@ -1765,12 +1765,11 @@ function LegalSection({ heading, children }) {
 
 function GamePage() {
   const GOOD_EMOJIS = ['\ud83e\uddf4', '\ud83e\udee7', '\ud83d\udc84', '\ud83e\udd6b', '\ud83e\uddc8', '\ud83c\udf39', '\ud83e\udea5', '\ud83e\uddfc'];
-  const BAD_EMOJIS = ['\ud83d\udca3', '\ud83e\udea8'];
-  const WIDTH = 100; // percent-based play field
+  const GAME_SECONDS = 120;
   const [items, setItems] = useState([]);
   const [basketX, setBasketX] = useState(50);
   const [score, setScore] = useState(0);
-  const [lives, setLives] = useState(3);
+  const [timeLeft, setTimeLeft] = useState(GAME_SECONDS);
   const [running, setRunning] = useState(false);
   const [gameOver, setGameOver] = useState(false);
   const [highScore, setHighScore] = useState(0);
@@ -1806,16 +1805,29 @@ function GamePage() {
     }).catch(() => {});
   }, []);
 
+  const endGame = () => {
+    setRunning(false);
+    setGameOver(true);
+    setScore((s) => {
+      if (s > highScore) {
+        setHighScore(s);
+        window.storage.set('mm-game-highscore', String(s)).catch(() => {});
+      }
+      return s;
+    });
+  };
+
   const startGame = () => {
     setItems([]);
     setScore(0);
-    setLives(3);
+    setTimeLeft(GAME_SECONDS);
     setGameOver(false);
     setBasketX(50);
     spawnTimer.current = 0;
     setRunning(true);
   };
 
+  // Falling-item loop
   useEffect(() => {
     if (!running) return;
     const interval = setInterval(() => {
@@ -1824,52 +1836,43 @@ function GamePage() {
         let next = prev.map((it) => ({ ...it, y: it.y + it.speed }));
         // spawn a new item roughly every ~1.1s
         if (spawnTimer.current % 11 === 0) {
-          const isBad = Math.random() < 0.28;
           next = [...next, {
             id: nextId.current++,
             x: 8 + Math.random() * 84,
             y: 0,
             speed: 2.2 + Math.random() * 1.6,
-            emoji: isBad ? BAD_EMOJIS[Math.floor(Math.random() * BAD_EMOJIS.length)] : GOOD_EMOJIS[Math.floor(Math.random() * GOOD_EMOJIS.length)],
-            isBad,
+            emoji: GOOD_EMOJIS[Math.floor(Math.random() * GOOD_EMOJIS.length)],
           }];
         }
         // check catches at the basket line (~88%)
         const survivors = [];
         let scoreDelta = 0;
-        let lifeDelta = 0;
         for (const it of next) {
           if (it.y >= 84 && it.y <= 94 && Math.abs(it.x - basketXRef.current) < 6.5) {
-            if (it.isBad) lifeDelta -= 1; else scoreDelta += 1;
-            continue; // caught, remove
+            scoreDelta += 1;
+            continue; // caught, remove, +1 star
           }
-          if (it.y > 100) {
-            if (!it.isBad) lifeDelta -= 0; // missing a good one is fine, no penalty
-            continue; // fell off screen, remove
-          }
+          if (it.y > 100) continue; // fell off screen, no penalty, just gone
           survivors.push(it);
         }
         if (scoreDelta) setScore((s) => s + scoreDelta);
-        if (lifeDelta) setLives((l) => Math.max(0, l + lifeDelta));
         return survivors;
       });
     }, 90);
     return () => clearInterval(interval);
   }, [running]);
 
+  // 2-minute countdown
   useEffect(() => {
-    if (running && lives <= 0) {
-      setRunning(false);
-      setGameOver(true);
-      setScore((s) => {
-        if (s > highScore) {
-          setHighScore(s);
-          window.storage.set('mm-game-highscore', String(s)).catch(() => {});
-        }
-        return s;
+    if (!running) return;
+    const timer = setInterval(() => {
+      setTimeLeft((t) => {
+        if (t <= 1) { endGame(); return 0; }
+        return t - 1;
       });
-    }
-  }, [lives, running, highScore]);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [running]);
 
   const moveBasket = (clientX) => {
     if (!fieldRef.current) return;
@@ -1891,22 +1894,19 @@ function GamePage() {
   };
   useEffect(() => () => { if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current); }, []);
 
+  const mins = String(Math.floor(timeLeft / 60)).padStart(2, '0');
+  const secs = String(timeLeft % 60).padStart(2, '0');
+  const isNewBest = gameOver && score > 0 && score >= highScore;
+
   return (
     <div className="p-4 pb-10 flex flex-col items-center gap-4">
-      <p style={{ fontFamily: bodyFont, fontSize: 12, color: COLORS.inkSoft, textAlign: 'center' }}>
-        Drag left/right to move the basket and catch the products. Avoid the bombs! Just for fun \u2014 no prizes here.
-      </p>
 
       <div className="flex items-center gap-5">
         <div className="flex items-center gap-1.5">
           <Star size={15} fill={COLORS.gold} color={COLORS.gold} />
           <span style={{ fontFamily: monoFont, fontWeight: 700, fontSize: 16, color: COLORS.ink }}>{score}</span>
         </div>
-        <div className="flex items-center gap-1">
-          {[0, 1, 2].map((i) => (
-            <Heart key={i} size={16} fill={i < lives ? COLORS.danger : 'none'} color={i < lives ? COLORS.danger : COLORS.border} />
-          ))}
-        </div>
+        <span style={{ fontFamily: monoFont, fontWeight: 700, fontSize: 15, color: running && timeLeft <= 10 ? COLORS.danger : COLORS.ink }}>{mins}:{secs}</span>
         <span style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft }}>Best: {highScore}</span>
       </div>
 
@@ -1944,8 +1944,10 @@ function GamePage() {
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3" style={{ background: 'rgba(0,0,0,0.35)' }}>
             {gameOver && (
               <>
-                <p style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 22, color: '#fff' }}>Game Over</p>
-                <p style={{ fontFamily: bodyFont, fontSize: 13, color: '#fff' }}>You scored {score}{score >= highScore && score > 0 ? ' \u2014 new best!' : ''}</p>
+                <p style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 22, color: '#fff' }}>Time&rsquo;s Up!</p>
+                <p style={{ fontFamily: bodyFont, fontSize: 13, color: '#fff' }}>
+                  You caught {score} star{score === 1 ? '' : 's'}{isNewBest ? ' \u2014 new best, you win! \ud83c\udf89' : ` \u2014 your best is ${highScore}`}
+                </p>
               </>
             )}
             <button onClick={startGame} className="px-6 py-3 rounded-full" style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 13.5 }}>
