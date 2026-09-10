@@ -399,7 +399,7 @@ function downloadTextFile(filename, text, mime) {
   a.href = url; a.download = filename; a.click();
   URL.revokeObjectURL(url);
 }
-function compressDataUrl(srcDataUrl, maxDim = 900, quality = 0.78) {
+function compressDataUrl(srcDataUrl, maxDim = 760, quality = 0.72) {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
