@@ -399,10 +399,41 @@ function downloadTextFile(filename, text, mime) {
   a.href = url; a.download = filename; a.click();
   URL.revokeObjectURL(url);
 }
+function compressDataUrl(srcDataUrl, maxDim = 900, quality = 0.78) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      let { width, height } = img;
+      if (width > maxDim || height > maxDim) {
+        if (width > height) { height = Math.round((height * maxDim) / width); width = maxDim; }
+        else { width = Math.round((width * maxDim) / height); height = maxDim; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+      try {
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      } catch (e) {
+        resolve(srcDataUrl); // fallback to the original if canvas export fails
+      }
+    };
+    img.onerror = () => resolve(srcDataUrl); // fallback if it's not a decodable image
+    img.src = srcDataUrl;
+  });
+}
 function readImageAsDataUrl(file) {
+  // Phone camera photos are often several MB at 3000px+ wide. Since these
+  // get embedded directly in the product list that loads on every visit,
+  // an uncompressed photo here means everyone re-downloads megabytes just
+  // to see a small thumbnail. This resizes to a sane max width and
+  // re-encodes as a compressed JPEG before it ever reaches the database.
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
+    reader.onload = () => {
+      compressDataUrl(reader.result).then(resolve);
+    };
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
@@ -609,7 +640,7 @@ function ProductCard({ product, onOpen, onAdd, qty, isWishlisted, onToggleWishli
     >
       <div className="relative flex items-center justify-center" style={{ height: imgH, background: product.imageUrl ? '#fff' : `linear-gradient(135deg, ${product.g1}, ${product.g2})` }}>
         {product.imageUrl ? (
-          <img src={product.imageUrl} alt={product.name} className="w-full h-full" style={{ objectFit: 'cover' }} />
+          <img src={product.imageUrl} alt={product.name} className="w-full h-full" style={{ objectFit: 'cover' }} loading="lazy" decoding="async" />
         ) : (
           <span style={{ fontSize: big ? 72 : 38 }}>{product.emoji}</span>
         )}
@@ -706,7 +737,7 @@ function CategorySlider({ categories, products, nav }) {
             <div className="flex-1 flex gap-2 p-3">
               {preview.length ? preview.map((p) => (
                 <div key={p.id} className="flex-1 rounded-xl overflow-hidden flex items-center justify-center" style={{ background: p.imageUrl ? '#fff' : `linear-gradient(135deg, ${p.g1}, ${p.g2})`, border: `1px solid ${COLORS.border}`, minHeight: 90 }}>
-                  {p.imageUrl ? <img src={p.imageUrl} alt={p.name} className="w-full h-full" style={{ objectFit: 'cover' }} /> : <span style={{ fontSize: 30 }}>{p.emoji}</span>}
+                  {p.imageUrl ? <img src={p.imageUrl} alt={p.name} className="w-full h-full" style={{ objectFit: 'cover' }} loading="lazy" decoding="async" /> : <span style={{ fontSize: 30 }}>{p.emoji}</span>}
                 </div>
               )) : (
                 <div className="flex-1 flex items-center justify-center" style={{ minHeight: 90 }}>
@@ -886,7 +917,7 @@ function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack
                 style={{ borderTop: `1px solid ${COLORS.border}` }}
               >
                 <div className="rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden" style={{ width: 34, height: 34, background: p.imageUrl ? '#fff' : `linear-gradient(135deg, ${p.g1}, ${p.g2})` }}>
-                  {p.imageUrl ? <img src={p.imageUrl} alt={p.name} className="w-full h-full" style={{ objectFit: 'cover' }} /> : <span style={{ fontSize: 15 }}>{p.emoji}</span>}
+                  {p.imageUrl ? <img src={p.imageUrl} alt={p.name} className="w-full h-full" style={{ objectFit: 'cover' }} loading="lazy" decoding="async" /> : <span style={{ fontSize: 15 }}>{p.emoji}</span>}
                 </div>
                 <span style={{ ...clamp1, flex: 1, textAlign: 'left', fontFamily: bodyFont, fontSize: 12.5, color: COLORS.ink }}>{p.name}</span>
                 <span style={{ fontFamily: monoFont, fontSize: 12, fontWeight: 700, color: COLORS.primaryDark, flexShrink: 0 }}>{money(p.price)}</span>
@@ -2545,6 +2576,8 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
   const [showCats, setShowCats] = useState(false);
   const [showBulk, setShowBulk] = useState(false);
   const [importMsg, setImportMsg] = useState('');
+  const [optimizing, setOptimizing] = useState(false);
+  const [optimizeMsg, setOptimizeMsg] = useState('');
   const [deleteError, setDeleteError] = useState('');
   const fileInputRef = useRef(null);
   const [catForm, setCatForm] = useState({ name: '', emoji: '\ud83c\udff7\ufe0f', color: '#D9730D' });
@@ -2591,6 +2624,32 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
     }))));
   };
 
+  const optimizeExistingPhotos = async () => {
+    // Rough heuristic: a data URL over ~150KB of base64 text is almost
+    // certainly an uncompressed photo from before this fix existed.
+    const candidates = products.filter((p) => p.imageUrl && p.imageUrl.startsWith('data:') && p.imageUrl.length > 150000);
+    if (!candidates.length) { setOptimizeMsg('All your photos are already optimized \u2014 nothing to do.'); return; }
+    setOptimizing(true);
+    setOptimizeMsg(`Optimizing ${candidates.length} photo${candidates.length > 1 ? 's' : ''}\u2026`);
+    let done = 0;
+    let failed = 0;
+    for (const p of candidates) {
+      try {
+        const compressed = await compressDataUrl(p.imageUrl);
+        if (BACKEND_ENABLED) {
+          await sbUpdate('products', `id=eq.${p.id}`, toDbProductPatch({ imageUrl: compressed }));
+        }
+        setProducts((current) => current.map((cp) => (cp.id === p.id ? { ...cp, imageUrl: compressed } : cp)));
+        done += 1;
+        setOptimizeMsg(`Optimizing photos\u2026 ${done + failed}/${candidates.length}`);
+      } catch (e) {
+        console.error('Could not optimize photo for', p.id, e);
+        failed += 1;
+      }
+    }
+    setOptimizing(false);
+    setOptimizeMsg(`Done \u2014 optimized ${done} photo${done === 1 ? '' : 's'}${failed ? `, ${failed} failed` : ''}.`);
+  };
   const handleImportFile = async (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
@@ -2740,6 +2799,17 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
         </div>
       )}
 
+      <div className="rounded-2xl p-4 mb-4 flex flex-col gap-2.5" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+        <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>Speed Up My Store</p>
+        <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft, lineHeight: 1.5 }}>
+          Photos added before this update may still be full-size, which slows down how fast your store opens for everyone. This compresses any large photo already on your products, without changing how they look.
+        </p>
+        <button onClick={optimizeExistingPhotos} disabled={optimizing} className="py-2.5 rounded-lg" style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, opacity: optimizing ? 0.7 : 1 }}>
+          {optimizing ? 'Optimizing\u2026' : 'Optimize My Product Photos'}
+        </button>
+        {optimizeMsg && <p style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.ink }}>{optimizeMsg}</p>}
+      </div>
+
       <button onClick={() => setShowBulk(!showBulk)} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl mb-3" style={{ border: `1.5px solid ${COLORS.ink}`, color: COLORS.ink }}>
         <ClipboardList size={15} /> <span style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 13 }}>{showBulk ? 'Close Bulk Upload' : 'Bulk Upload / Export (CSV)'}</span>
       </button>
@@ -2866,7 +2936,7 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
             <div key={p.id} className="rounded-2xl p-3 flex gap-3" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
               <div className="flex flex-col items-center gap-1 flex-shrink-0">
                 <div className="rounded-xl overflow-hidden flex items-center justify-center" style={{ width: 50, height: 50, background: p.imageUrl ? '#fff' : `linear-gradient(135deg, ${p.g1}, ${p.g2})`, border: `1px solid ${COLORS.border}` }}>
-                  {p.imageUrl ? <img src={p.imageUrl} alt={p.name} className="w-full h-full" style={{ objectFit: 'cover' }} /> : <span style={{ fontSize: 22 }}>{p.emoji}</span>}
+                  {p.imageUrl ? <img src={p.imageUrl} alt={p.name} className="w-full h-full" style={{ objectFit: 'cover' }} loading="lazy" decoding="async" /> : <span style={{ fontSize: 22 }}>{p.emoji}</span>}
                 </div>
                 <label className="cursor-pointer" style={{ color: COLORS.primaryDark }}>
                   <ImagePlus size={13} />
@@ -3334,12 +3404,6 @@ export default function App() {
             sbSelect('delivery_settings', '?select=*&id=eq.1'),
             sbSelect('delivery_pincodes', '?select=*'),
           ]);
-          try {
-            const reviewRows = await sbSelect('reviews', '?select=*&order=created_at.desc');
-            if (reviewRows) setReviews(reviewRows.map(mapReviewFromDb));
-          } catch (e) {
-            console.error('Could not load reviews (has fix-reviews.sql been run yet?):', e);
-          }
           if (prodRows) {
             setProducts(prodRows.map(mapProductFromDb));
           }
@@ -3348,6 +3412,13 @@ export default function App() {
             setDeliverySettings(mapped);
             setAdminPassword(mapped.adminPassword);
           }
+          // Reviews aren't needed for the very first paint (nobody sees them
+          // until they open a product), so load them in the background
+          // instead of making everyone wait on a third round-trip before
+          // the store is even visible.
+          sbSelect('reviews', '?select=*&order=created_at.desc')
+            .then((reviewRows) => { if (reviewRows) setReviews(reviewRows.map(mapReviewFromDb)); })
+            .catch((e) => console.error('Could not load reviews (has fix-reviews.sql been run yet?):', e));
         } catch (e) {
           console.error('Supabase load failed, showing local demo data instead:', e);
         }
