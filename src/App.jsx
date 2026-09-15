@@ -951,8 +951,8 @@ function BottomNav({ page, nav, cartCount }) {
       className="fixed bottom-4 left-1/2 z-30 flex items-stretch"
       style={{
         transform: 'translateX(-50%)', width: 'calc(100% - 32px)', maxWidth: 416,
-        background: currentTheme === 'dark' ? 'rgba(30,26,20,0.35)' : 'rgba(255,255,255,0.32)',
-        backdropFilter: 'blur(22px) saturate(160%)', WebkitBackdropFilter: 'blur(22px) saturate(160%)',
+        background: currentTheme === 'dark' ? 'rgba(30,26,20,0.16)' : 'rgba(255,255,255,0.14)',
+        backdropFilter: 'blur(10px) saturate(160%)', WebkitBackdropFilter: 'blur(10px) saturate(160%)',
         border: `1px solid ${currentTheme === 'dark' ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.55)'}`,
         borderRadius: 999,
         boxShadow: `0 8px 28px rgba(0,0,0,0.16), inset 0 1px 0 ${currentTheme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.7)'}`,
