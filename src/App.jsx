@@ -96,7 +96,9 @@ function isBannerActive(ds) {
   }
   return true;
 }
+let currentTheme = 'light';
 function applyTheme(mode, deliverySettings) {
+  currentTheme = mode === 'dark' ? 'dark' : 'light';
   Object.assign(COLORS, mode === 'dark' ? DARK_THEME : LIGHT_THEME);
   // While a festive banner is live, tint the app's primary accent (buttons,
   // highlights) to match it, so the celebration isn't confined to the banner.
@@ -474,7 +476,7 @@ const CATEGORIES = [
   { id: 'cosmetics', name: 'Cosmetics & Beauty', Icon: Sparkles, color: COLORS.rose },
   { id: 'skincare', name: 'Skincare', Icon: Droplet, color: COLORS.secondary },
   { id: 'haircare', name: 'Hair Care', Icon: Wind, color: COLORS.purple },
-  { id: 'personalcare', name: 'Personal Care', Icon: Heart, color: COLORS.primary },
+  { id: 'personalcare', name: 'Personal Care', Icon: Heart, color: COLORS.ink },
   { id: 'perfumes', name: 'Perfumes & Fragrances', Icon: Flower, color: '#8E5B3F' },
   { id: 'makeup', name: 'Makeup', Icon: Palette, color: '#C13584' },
   { id: 'bath', name: 'Bath & Hygiene', Icon: Droplets, color: COLORS.blue },
@@ -582,7 +584,7 @@ function PriceTag({ price, mrp, size = 'md' }) {
   return (
     <div
       className="inline-flex flex-col items-start rounded"
-      style={{ background: '#FFFFFF', color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, padding: big ? '8px 12px' : '5px 9px', transform: 'rotate(-2deg)' }}
+      style={{ background: 'transparent', color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, padding: big ? '8px 12px' : '5px 9px', transform: 'rotate(-2deg)' }}
     >
       <span style={{ fontWeight: 700, fontSize: big ? 22 : 15, lineHeight: 1, color: COLORS.ink }}>{money(price)}</span>
       {off > 0 && (
@@ -635,7 +637,7 @@ function ProductCard({ product, onOpen, onAdd, qty, isWishlisted, onToggleWishli
   return (
     <div
       className="rounded-2xl overflow-hidden flex flex-col cursor-pointer"
-      style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, minWidth: cardW, width: cardW }}
+      style={{ background: currentTheme === 'dark' ? COLORS.card : 'rgba(255,255,255,0.62)', backdropFilter: currentTheme === 'dark' ? undefined : 'blur(6px)', WebkitBackdropFilter: currentTheme === 'dark' ? undefined : 'blur(6px)', border: `1px solid ${COLORS.border}`, minWidth: cardW, width: cardW }}
       onClick={() => onOpen(product)}
     >
       <div className="relative flex items-center justify-center" style={{ height: imgH, background: product.imageUrl ? '#fff' : `linear-gradient(135deg, ${product.g1}, ${product.g2})` }}>
@@ -677,7 +679,7 @@ function ProductCard({ product, onOpen, onAdd, qty, isWishlisted, onToggleWishli
             onClick={(e) => { e.stopPropagation(); onAdd(product); }}
             disabled={product.stock === 0}
             className="rounded-full flex items-center justify-center"
-            style={{ width: big ? 46 : 30, height: big ? 46 : 30, background: product.stock === 0 ? COLORS.border : COLORS.primary, color: '#fff', flexShrink: 0 }}
+            style={{ width: big ? 46 : 30, height: big ? 46 : 30, background: 'transparent', border: `1.5px solid ${product.stock === 0 ? COLORS.border : COLORS.primary}`, color: product.stock === 0 ? COLORS.inkSoft : COLORS.primary, flexShrink: 0 }}
           >
             <Plus size={big ? 23 : 15} />
           </button>
@@ -696,7 +698,7 @@ function SectionHeader({ title, subtitle, onSeeAll }) {
         {subtitle && <p style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.inkSoft }}>{subtitle}</p>}
       </div>
       {onSeeAll && (
-        <button onClick={onSeeAll} className="flex items-center gap-0.5" style={{ color: COLORS.primaryDark, fontFamily: bodyFont, fontSize: 12, fontWeight: 700 }}>
+        <button onClick={onSeeAll} className="flex items-center gap-0.5" style={{ color: COLORS.ink, fontFamily: bodyFont, fontSize: 12, fontWeight: 700 }}>
           See all <ChevronRight size={14} />
         </button>
       )}
@@ -726,8 +728,8 @@ function CategorySlider({ categories, products, nav }) {
             style={{ width: 230, minHeight: 260, background: COLORS.card, border: `1px solid ${COLORS.border}`, boxShadow: '0 6px 18px rgba(0,0,0,0.06)' }}
           >
             <div className="flex items-center gap-3 p-4" style={{ background: `${c.color}1A` }}>
-              <div className="rounded-2xl flex items-center justify-center flex-shrink-0" style={{ width: 48, height: 48, background: c.color }}>
-                <c.Icon size={24} color="#fff" />
+              <div className="rounded-2xl flex items-center justify-center flex-shrink-0" style={{ width: 48, height: 48, background: 'transparent' }}>
+                <c.Icon size={24} color={c.color} />
               </div>
               <div className="min-w-0">
                 <p style={{ ...clamp1, fontFamily: bodyFont, fontWeight: 700, fontSize: 15, color: COLORS.ink }}>{c.name}</p>
@@ -788,26 +790,23 @@ function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack
 
   if (title) {
     return (
-      <div className="sticky top-0 z-20 flex items-center gap-3 px-4 py-3" style={{ background: theme === 'dark' ? COLORS.bg : '#FFF3B0', borderBottom: `1px solid ${COLORS.border}` }}>
+      <div className={`sticky top-0 z-20 flex items-center gap-3 px-4 py-3 ${theme !== 'dark' ? 'rainbow-bg' : ''}`} style={{ background: theme === 'dark' ? COLORS.bg : undefined, borderBottom: `1px solid ${COLORS.border}` }}>
         <button onClick={onBack}><ArrowLeft size={20} color={COLORS.ink} /></button>
         <h1 style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 17, color: COLORS.ink }}>{title}</h1>
       </div>
     );
   }
   return (
-    <div className="sticky top-0 z-20" style={{ background: theme === 'dark' ? COLORS.bg : '#FFF3B0', borderBottom: `1px solid ${COLORS.border}` }}>
+    <div className={`sticky top-0 z-20 ${theme !== 'dark' ? 'rainbow-bg' : ''}`} style={{ background: theme === 'dark' ? COLORS.bg : undefined, borderBottom: `1px solid ${COLORS.border}` }}>
       <div className="flex items-center justify-between px-4 pt-3">
         <div className="flex items-center gap-2">
-          <div className="rounded-xl flex items-center justify-center" style={{ width: 36, height: 36, background: '#FFC93C' }}>
-            <span style={{ fontSize: 24 }}>&#127978;</span>
-          </div>
           <div>
             <h1 style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 18, color: COLORS.ink, lineHeight: 1 }}>{shopName}</h1>
             <p style={{ fontFamily: bodyFont, fontSize: 10, color: COLORS.inkSoft }}>{t('tagline')}</p>
           </div>
         </div>
         <div className="flex items-center gap-2" style={{ position: 'relative' }}>
-          <button onClick={() => setShowMenu(!showMenu)} className="flex items-center justify-center rounded-full" style={{ width: 30, height: 30, background: COLORS.cream, border: `1px solid ${COLORS.border}` }}>
+          <button onClick={() => setShowMenu(!showMenu)} className="flex items-center justify-center rounded-full" style={{ width: 30, height: 30, background: 'transparent', border: `1px solid ${COLORS.border}` }}>
             <MoreVertical size={15} color={COLORS.ink} />
           </button>
           {showMenu && (
@@ -840,11 +839,11 @@ function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack
             </>
           )}
           {setTheme && (
-            <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="flex items-center justify-center rounded-full" style={{ width: 30, height: 30, background: COLORS.cream, border: `1px solid ${COLORS.border}` }}>
+            <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="flex items-center justify-center rounded-full" style={{ width: 30, height: 30, background: 'transparent', border: `1px solid ${COLORS.border}` }}>
               {theme === 'dark' ? <Sun size={14} color={COLORS.gold} /> : <Moon size={14} color={COLORS.secondary} />}
             </button>
           )}
-          <button onClick={onChangeLocation} className="flex items-center gap-1 px-2.5 py-1.5 rounded-full" style={{ background: COLORS.cream, border: `1px solid ${COLORS.border}` }}>
+          <button onClick={onChangeLocation} className="flex items-center gap-1 px-2.5 py-1.5 rounded-full" style={{ background: 'transparent', border: `1px solid ${COLORS.border}` }}>
             <MapPin size={13} color={COLORS.secondary} />
             <span style={{ fontFamily: bodyFont, fontSize: 11, fontWeight: 700, color: COLORS.ink, maxWidth: 78, ...clamp1 }}>{area || t('setLocation')}</span>
             <ChevronDown size={12} color={COLORS.inkSoft} />
@@ -864,7 +863,7 @@ function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack
           <div
             className="flex items-center gap-2 px-3 py-2.5"
             style={{
-              background: COLORS.card, border: `1.5px solid ${focused ? COLORS.primary : COLORS.border}`,
+              background: 'transparent', border: `1.5px solid ${focused ? COLORS.primary : COLORS.border}`,
               borderRadius: hasSuggestions ? '14px 14px 0 0' : 14,
               boxShadow: focused ? '0 4px 14px rgba(217,115,13,0.12)' : 'none',
               transition: 'border-color 120ms ease, box-shadow 120ms ease',
@@ -920,7 +919,7 @@ function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack
                   {p.imageUrl ? <img src={p.imageUrl} alt={p.name} className="w-full h-full" style={{ objectFit: 'cover' }} loading="lazy" decoding="async" /> : <span style={{ fontSize: 15 }}>{p.emoji}</span>}
                 </div>
                 <span style={{ ...clamp1, flex: 1, textAlign: 'left', fontFamily: bodyFont, fontSize: 12.5, color: COLORS.ink }}>{p.name}</span>
-                <span style={{ fontFamily: monoFont, fontSize: 12, fontWeight: 700, color: COLORS.primaryDark, flexShrink: 0 }}>{money(p.price)}</span>
+                <span style={{ fontFamily: monoFont, fontSize: 12, fontWeight: 700, color: COLORS.ink, flexShrink: 0 }}>{money(p.price)}</span>
               </button>
             ))}
             <button
@@ -930,7 +929,7 @@ function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack
               style={{ borderTop: `1px solid ${COLORS.border}`, background: COLORS.cream }}
             >
               <Search size={12} color={COLORS.primaryDark} />
-              <span style={{ fontFamily: bodyFont, fontSize: 11.5, fontWeight: 700, color: COLORS.primaryDark }}>See all results for &ldquo;{query}&rdquo;</span>
+              <span style={{ fontFamily: bodyFont, fontSize: 11.5, fontWeight: 700, color: COLORS.ink }}>See all results for &ldquo;{query}&rdquo;</span>
             </button>
           </div>
         )}
@@ -948,11 +947,21 @@ function BottomNav({ page, nav, cartCount }) {
     { id: 'admin', label: t('admin'), Icon: Lock },
   ];
   return (
-    <div className="sticky bottom-0 z-30 flex items-stretch" style={{ background: COLORS.card, borderTop: `1px solid ${COLORS.border}` }}>
+    <div
+      className="fixed bottom-4 left-1/2 z-30 flex items-stretch"
+      style={{
+        transform: 'translateX(-50%)', width: 'calc(100% - 32px)', maxWidth: 416,
+        background: currentTheme === 'dark' ? 'rgba(30,26,20,0.35)' : 'rgba(255,255,255,0.32)',
+        backdropFilter: 'blur(22px) saturate(160%)', WebkitBackdropFilter: 'blur(22px) saturate(160%)',
+        border: `1px solid ${currentTheme === 'dark' ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.55)'}`,
+        borderRadius: 999,
+        boxShadow: `0 8px 28px rgba(0,0,0,0.16), inset 0 1px 0 ${currentTheme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.7)'}`,
+      }}
+    >
       {items.map((it) => {
         const active = page === it.id || (it.id === 'admin' && page.startsWith('admin'));
         return (
-          <button key={it.id} onClick={() => nav(it.id)} className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 relative">
+          <button key={it.id} onClick={() => nav(it.id)} className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 relative">
             <div className="relative">
               <it.Icon size={19} color={active ? COLORS.primary : COLORS.inkSoft} strokeWidth={active ? 2.4 : 2} />
               {!!it.badge && (
@@ -961,7 +970,7 @@ function BottomNav({ page, nav, cartCount }) {
                 </span>
               )}
             </div>
-            <span style={{ fontSize: 10, fontFamily: bodyFont, fontWeight: active ? 700 : 500, color: active ? COLORS.primary : COLORS.inkSoft }}>{it.label}</span>
+            <span style={{ fontSize: 9.5, fontFamily: bodyFont, fontWeight: active ? 700 : 500, color: active ? COLORS.primary : COLORS.inkSoft }}>{it.label}</span>
           </button>
         );
       })}
@@ -1035,7 +1044,7 @@ function HomePage({ products, nav, onAdd, cart, area, categories, deliverySettin
             {deliverySettings.bannerSubtitle && (
               <p style={{ fontFamily: bodyFont, fontSize: 13, color: '#fff', opacity: 0.92, marginTop: 4 }}>{deliverySettings.bannerSubtitle}</p>
             )}
-            <button onClick={() => nav('category', { id: deliverySettings.bannerCategory })} className="mt-4 px-4 py-2 rounded-full" style={{ background: COLORS.card, color: COLORS.primaryDark, fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>
+            <button onClick={() => nav('category', { id: deliverySettings.bannerCategory })} className="mt-4 px-4 py-2 rounded-full" style={{ background: COLORS.card, color: COLORS.ink, fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>
               {deliverySettings.bannerCta || t('shopNow')}
             </button>
           </div>
@@ -1047,7 +1056,7 @@ function HomePage({ products, nav, onAdd, cart, area, categories, deliverySettin
       <div className="flex gap-4 px-4 mb-6 overflow-x-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         {categories.map((c) => (
           <button key={c.id} onClick={() => nav('category', { id: c.id })} className="flex flex-col items-center gap-1.5 flex-shrink-0" style={{ width: 64 }}>
-            <div className="rounded-2xl flex items-center justify-center" style={{ width: 56, height: 56, background: `${c.color}1A` }}>
+            <div className="rounded-2xl flex items-center justify-center" style={{ width: 56, height: 56, background: 'transparent' }}>
               <c.Icon size={22} color={c.color} />
             </div>
             <span style={{ ...clamp2, textAlign: 'center', fontFamily: bodyFont, fontSize: 10, fontWeight: 600, color: COLORS.ink, lineHeight: 1.2 }}>{c.name}</span>
@@ -1093,8 +1102,8 @@ function CategoriesPage({ nav, categories }) {
     <div className="p-4 grid grid-cols-2 gap-3">
       {categories.map((c) => (
         <button key={c.id} onClick={() => nav('category', { id: c.id })} className="rounded-2xl p-4 flex flex-col items-start gap-3" style={{ background: `${c.color}14`, border: `1px solid ${c.color}33` }}>
-          <div className="rounded-xl flex items-center justify-center" style={{ width: 42, height: 42, background: c.color }}>
-            <c.Icon size={20} color="#fff" />
+          <div className="rounded-xl flex items-center justify-center" style={{ width: 42, height: 42, background: 'transparent' }}>
+            <c.Icon size={20} color={c.color} />
           </div>
           <span style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink, textAlign: 'left' }}>{c.name}</span>
         </button>
@@ -1131,7 +1140,7 @@ function WishlistPage({ products, wishlist, nav, onAdd, cart, onToggleWishlist }
         <div className="flex flex-col items-center py-16 gap-2">
           <Heart size={36} color={COLORS.inkSoft} />
           <p style={{ fontFamily: bodyFont, color: COLORS.inkSoft, fontSize: 13 }}>{t('nothingSavedYet')}</p>
-          <button onClick={() => nav('home')} className="mt-2 px-4 py-2 rounded-full" style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>{t('browseProducts')}</button>
+          <button onClick={() => nav('home')} className="mt-2 px-4 py-2 rounded-full" style={{ background: 'transparent', border: `1.5px solid ${COLORS.primary}`, color: COLORS.ink, fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>{t('browseProducts')}</button>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3">
@@ -1261,7 +1270,7 @@ function ProductPage({ product, nav, onAdd, onBuyNow, qty, reviews = [], onAddRe
           <div className="flex items-center justify-between mb-3">
             <h3 style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 14, color: COLORS.ink }}>{t('ratingsAndReviews')}</h3>
             {!showForm && (
-              <button onClick={() => setShowForm(true)} style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12, color: COLORS.primary }}>
+              <button onClick={() => setShowForm(true)} style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12, color: COLORS.ink }}>
                 {t('writeReview')}
               </button>
             )}
@@ -1316,7 +1325,7 @@ function ProductPage({ product, nav, onAdd, onBuyNow, qty, reviews = [], onAddRe
             onClick={() => onAdd(product, n)}
             disabled={product.stock === 0}
             className="flex-1 py-3 rounded-xl flex items-center justify-center gap-2"
-            style={{ background: COLORS.cream, border: `2px solid ${COLORS.primary}`, color: COLORS.primaryDark, fontFamily: bodyFont, fontWeight: 700, fontSize: 13.5, opacity: product.stock === 0 ? 0.5 : 1 }}
+            style={{ background: 'transparent', border: `2px solid ${COLORS.primary}`, color: COLORS.ink, fontFamily: bodyFont, fontWeight: 700, fontSize: 13.5, opacity: product.stock === 0 ? 0.5 : 1 }}
           >
             <ShoppingCart size={16} /> {t('addToCart')}
           </button>
@@ -1342,7 +1351,7 @@ function CartPage({ cartItems, updateQty, removeItem, subtotal, nav, products = 
         <ShoppingCart size={40} color={COLORS.inkSoft} />
         <p style={{ fontFamily: bodyFont, color: COLORS.ink, fontWeight: 700, fontSize: 14 }}>{t('emptyCart')}</p>
         <p style={{ fontFamily: bodyFont, color: COLORS.inkSoft, fontSize: 12, textAlign: 'center' }}>Explore our categories and add items you love.</p>
-        <button onClick={() => nav('categories')} className="px-5 py-2.5 rounded-full mt-1" style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>Browse Categories</button>
+        <button onClick={() => nav('categories')} className="px-5 py-2.5 rounded-full mt-1" style={{ background: 'transparent', border: `1.5px solid ${COLORS.primary}`, color: COLORS.ink, fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>Browse Categories</button>
         {!!deals.length && (
           <div className="w-full mt-6">
             <Rail products={deals} onOpen={(p) => nav('product', { id: p.id })} onAdd={onAdd} cart={cart} wishlist={wishlist} onToggleWishlist={onToggleWishlist} />
@@ -1361,7 +1370,7 @@ function CartPage({ cartItems, updateQty, removeItem, subtotal, nav, products = 
             </div>
             <div className="flex-1 min-w-0">
               <p style={{ ...clamp1, fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>{item.name}</p>
-              <p style={{ fontFamily: monoFont, fontSize: 12.5, color: COLORS.primaryDark, fontWeight: 700, marginTop: 3 }}>{money(item.price)}</p>
+              <p style={{ fontFamily: monoFont, fontSize: 12.5, color: COLORS.ink, fontWeight: 700, marginTop: 3 }}>{money(item.price)}</p>
               <div className="flex items-center gap-3 mt-2">
                 <div className="flex items-center gap-2 px-2 py-1 rounded-full" style={{ border: `1px solid ${COLORS.border}` }}>
                   <button onClick={() => updateQty(item.id, item.qty - 1)}><Minus size={12} /></button>
@@ -2311,7 +2320,7 @@ function AdminLogin({ onLogin, adminPassword }) {
 
   return (
     <div className="flex flex-col items-center px-6 pt-20">
-      <div className="rounded-full flex items-center justify-center mb-4" style={{ width: 56, height: 56, background: COLORS.cream }}>
+      <div className="rounded-full flex items-center justify-center mb-4" style={{ width: 56, height: 56, background: 'transparent', border: `1.5px solid ${COLORS.border}` }}>
         <Lock size={24} color={COLORS.primary} />
       </div>
       <h2 style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 19, color: COLORS.ink }}>Admin Dashboard</h2>
@@ -2322,7 +2331,7 @@ function AdminLogin({ onLogin, adminPassword }) {
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Admin email" className="w-full px-4 py-3 rounded-xl mb-2.5" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none' }} />
           <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder="Password" className="w-full px-4 py-3 rounded-xl mb-3" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none' }} />
           {err && <p style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.danger, marginBottom: 8 }}>{err}</p>}
-          <button onClick={submitReal} disabled={busy} className="w-full py-3.5 rounded-xl" style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 14, opacity: busy ? 0.7 : 1 }}>
+          <button onClick={submitReal} disabled={busy} className="w-full py-3.5 rounded-xl" style={{ background: 'transparent', border: `1.5px solid ${COLORS.primary}`, color: COLORS.ink, fontFamily: bodyFont, fontWeight: 700, fontSize: 14, opacity: busy ? 0.7 : 1 }}>
             {busy ? 'Logging in...' : 'Login'}
           </button>
           <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft, marginTop: 10, textAlign: 'center' }}>Log in with the admin account created in Supabase (Authentication &rarr; Users).</p>
@@ -2331,7 +2340,7 @@ function AdminLogin({ onLogin, adminPassword }) {
         <>
           <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder="Enter admin password" className="w-full px-4 py-3 rounded-xl mb-3" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none' }} />
           {err && <p style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.danger, marginBottom: 8 }}>{err}</p>}
-          <button onClick={submitLocal} className="w-full py-3.5 rounded-xl" style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 14 }}>
+          <button onClick={submitLocal} className="w-full py-3.5 rounded-xl" style={{ background: 'transparent', border: `1.5px solid ${COLORS.primary}`, color: COLORS.ink, fontFamily: bodyFont, fontWeight: 700, fontSize: 14 }}>
             Login
           </button>
         </>
@@ -2491,7 +2500,7 @@ function AdminOverview({ products, salesLog, onRefresh, onViewInvoice }) {
   const weekSales = salesLog.filter((o) => o.createdAt >= startOfWeek.getTime());
   const revenue = salesLog.reduce((s, o) => s + o.total, 0);
   const kpis = [
-    { label: 'Total Orders', value: salesLog.length, color: COLORS.primary },
+    { label: 'Total Orders', value: salesLog.length, color: COLORS.ink },
     { label: 'Total Revenue', value: money(revenue), color: COLORS.secondary },
     { label: "Today's Sales", value: money(todaySales.reduce((s, o) => s + o.total, 0)), color: COLORS.gold },
     { label: "This Week's Sales", value: money(weekSales.reduce((s, o) => s + o.total, 0)), color: COLORS.rose },
@@ -2561,7 +2570,7 @@ function AdminOverview({ products, salesLog, onRefresh, onViewInvoice }) {
               </div>
               <p style={{ fontFamily: monoFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>{money(o.total)}</p>
               <button onClick={() => onViewInvoice(o)} className="px-3 py-1.5 rounded-full" style={{ border: `1px solid ${COLORS.border}` }}>
-                <span style={{ fontFamily: bodyFont, fontSize: 10.5, fontWeight: 700, color: COLORS.primary }}>Invoice</span>
+                <span style={{ fontFamily: bodyFont, fontSize: 10.5, fontWeight: 700, color: COLORS.ink }}>Invoice</span>
               </button>
             </div>
           ))}
@@ -2867,7 +2876,7 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
             <div className="rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0" style={{ width: 56, height: 56, background: COLORS.cream, border: `1px solid ${COLORS.border}` }}>
               {form.imageUrl ? <img src={form.imageUrl} alt="preview" className="w-full h-full" style={{ objectFit: 'cover' }} /> : <span style={{ fontSize: 20 }}>{form.emoji}</span>}
             </div>
-            <label className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg cursor-pointer" style={{ border: `1px dashed ${COLORS.primary}`, color: COLORS.primaryDark }}>
+            <label className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg cursor-pointer" style={{ border: `1px dashed ${COLORS.primary}`, color: COLORS.ink }}>
               <ImagePlus size={15} /> <span style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12 }}>{form.imageUrl ? 'Change Photo' : 'Add Photo'}</span>
               <input type="file" accept="image/*" onChange={handleNewPhoto} className="hidden" />
             </label>
@@ -2920,7 +2929,7 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
                   <div className="rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0" style={{ width: 56, height: 56, background: COLORS.cream, border: `1px solid ${COLORS.border}` }}>
                     {editForm.imageUrl ? <img src={editForm.imageUrl} alt="preview" className="w-full h-full" style={{ objectFit: 'cover' }} /> : <span style={{ fontSize: 20 }}>{editForm.emoji}</span>}
                   </div>
-                  <label className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg cursor-pointer" style={{ border: `1px dashed ${COLORS.primary}`, color: COLORS.primaryDark }}>
+                  <label className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg cursor-pointer" style={{ border: `1px dashed ${COLORS.primary}`, color: COLORS.ink }}>
                     <ImagePlus size={15} /> <span style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12 }}>{editForm.imageUrl ? 'Change Photo' : 'Add Photo'}</span>
                     <input type="file" accept="image/*" onChange={handleEditPhoto} className="hidden" />
                   </label>
@@ -2938,7 +2947,7 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
                 <div className="rounded-xl overflow-hidden flex items-center justify-center" style={{ width: 50, height: 50, background: p.imageUrl ? '#fff' : `linear-gradient(135deg, ${p.g1}, ${p.g2})`, border: `1px solid ${COLORS.border}` }}>
                   {p.imageUrl ? <img src={p.imageUrl} alt={p.name} className="w-full h-full" style={{ objectFit: 'cover' }} loading="lazy" decoding="async" /> : <span style={{ fontSize: 22 }}>{p.emoji}</span>}
                 </div>
-                <label className="cursor-pointer" style={{ color: COLORS.primaryDark }}>
+                <label className="cursor-pointer" style={{ color: COLORS.ink }}>
                   <ImagePlus size={13} />
                   <input type="file" accept="image/*" onChange={handleRowPhoto(p.id)} className="hidden" />
                 </label>
@@ -3180,7 +3189,7 @@ function AdminDelivery({ settings, setSettings, categories }) {
                 <p style={{ fontFamily: bodyFont, fontSize: 10, color: '#FBE3B0', fontWeight: 700, letterSpacing: 0.5 }}>PREVIEW</p>
                 <h2 style={{ fontFamily: displayFont, fontWeight: 700, fontStyle: 'italic', fontSize: 20, color: '#fff', marginTop: 4, lineHeight: 1.15 }}>{local.bannerTitle || 'Your Banner Title'}</h2>
                 <p style={{ fontFamily: bodyFont, fontSize: 12, color: '#fff', opacity: 0.9, marginTop: 2 }}>{local.bannerSubtitle || 'Your banner subtitle goes here'}</p>
-                <button className="mt-3 px-4 py-2 rounded-full" style={{ background: COLORS.card, color: COLORS.primaryDark, fontFamily: bodyFont, fontWeight: 700, fontSize: 12 }}>{local.bannerCta || 'Shop Now'}</button>
+                <button className="mt-3 px-4 py-2 rounded-full" style={{ background: COLORS.card, color: COLORS.ink, fontFamily: bodyFont, fontWeight: 700, fontSize: 12 }}>{local.bannerCta || 'Shop Now'}</button>
               </div>
               <span className="absolute" style={{ right: -6, bottom: -14, fontSize: 64, opacity: 0.3 }}>{local.bannerEmoji || '\ud83c\udf89'}</span>
             </div>
@@ -3286,7 +3295,7 @@ function AdminCustomers({ salesLog }) {
       <div className="flex flex-col gap-3">
         {customers.map((c) => (
           <div key={c.mobile} className="rounded-2xl p-4 flex items-center gap-3" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
-            <div className="rounded-full flex items-center justify-center flex-shrink-0" style={{ width: 40, height: 40, background: COLORS.cream, fontFamily: displayFont, fontWeight: 700, color: COLORS.primary }}>{c.name.charAt(0).toUpperCase()}</div>
+            <div className="rounded-full flex items-center justify-center flex-shrink-0" style={{ width: 40, height: 40, background: COLORS.cream, fontFamily: displayFont, fontWeight: 700, color: COLORS.ink }}>{c.name.charAt(0).toUpperCase()}</div>
             <div className="flex-1 min-w-0">
               <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>{c.name}</p>
               <p style={{ fontFamily: monoFont, fontSize: 11, color: COLORS.inkSoft }}>{c.mobile} &bull; {c.pincode}</p>
@@ -3626,16 +3635,16 @@ export default function App() {
 
   if (!loaded) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: theme === 'dark' ? COLORS.bg : '#FFF3B0' }}>
-        <p style={{ fontFamily: displayFont, fontStyle: 'italic', fontSize: 18, color: COLORS.primary }}>Loading Kuljeet Store&hellip;</p>
+      <div className={`min-h-screen flex items-center justify-center ${theme !== 'dark' ? 'rainbow-bg' : ''}`} style={{ background: theme === 'dark' ? COLORS.bg : undefined }}>
+        <p style={{ fontFamily: displayFont, fontStyle: 'italic', fontSize: 18, color: COLORS.ink }}>Loading Kuljeet Store&hellip;</p>
       </div>
     );
   }
 
   return (
     <>
-    <div className="min-h-screen flex justify-center app-shell" style={{ background: theme === 'dark' ? COLORS.bg : 'linear-gradient(180deg, #FFF3B0 0%, #FBF6EC 600px)', fontFamily: bodyFont }}>
-      <div className="w-full flex flex-col" style={{ maxWidth: 448, minHeight: '100vh', background: theme === 'dark' ? COLORS.bg : 'linear-gradient(180deg, #FFF3B0 0%, #FBF6EC 600px)', boxShadow: '0 0 40px rgba(0,0,0,0.06)' }}>
+    <div className={`min-h-screen flex justify-center app-shell ${theme !== 'dark' ? 'rainbow-bg' : ''}`} style={{ background: theme === 'dark' ? COLORS.bg : undefined, fontFamily: bodyFont }}>
+      <div className={`w-full flex flex-col ${theme !== 'dark' ? 'rainbow-bg' : ''}`} style={{ maxWidth: 448, minHeight: '100vh', background: theme === 'dark' ? COLORS.bg : undefined, boxShadow: '0 0 40px rgba(0,0,0,0.06)' }}>
         {showLocationModal && !isAdminRoute && (
           <LocationModal
             deliverySettings={deliverySettings}
@@ -3696,12 +3705,25 @@ export default function App() {
             />
           )}
         </div>
+        <div style={{ height: 96 }} />
 
         <BottomNav page={route.page} nav={nav} cartCount={cartCount} />
       </div>
     </div>
     {viewInvoice && <InvoiceOverlay order={viewInvoice} deliverySettings={deliverySettings} onClose={() => setViewInvoice(null)} />}
-    <style>{`@media print { .app-shell { display: none !important; } }`}</style>
+    <style>{`
+      @media print { .app-shell { display: none !important; } }
+      .rainbow-bg {
+        background: linear-gradient(270deg, #FFF3B0, #FFD9B0, #FFC2D1, #E3C2FF, #C2D9FF, #C2F0E3, #D9FFC2, #FFF3B0);
+        background-size: 400% 400%;
+        animation: rainbowFloat 22s ease-in-out infinite;
+      }
+      @keyframes rainbowFloat {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+      }
+    `}</style>
     </>
   );
 }
