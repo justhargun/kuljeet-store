@@ -1048,7 +1048,24 @@ function HomePage({ products, nav, onAdd, cart, area, categories, deliverySettin
   const deals = products.filter((p) => p.deal);
   const recommended = [...products].sort((a, b) => b.rating - a.rating).slice(0, 8);
   return (
-    <div className="pb-6">
+    <div className="pb-6" style={{ position: 'relative' }}>
+      <div
+        className="absolute flex items-center justify-center"
+        style={{
+          top: 0, left: 0, right: 0, height: 400, zIndex: 0, pointerEvents: 'none', overflow: 'hidden',
+        }}
+      >
+        <span
+          style={{
+            fontFamily: displayFont, fontWeight: 500, fontSize: 'min(9vw, 38px)', letterSpacing: 9,
+            color: currentTheme === 'dark' ? 'rgba(255,255,255,0.14)' : 'rgba(34,31,26,0.11)',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          KULJEET STORE
+        </span>
+      </div>
+      <div style={{ position: 'relative', zIndex: 1 }}>
       {isBannerActive(deliverySettings) && (
         <div className="mx-4 mt-1 mb-5 rounded-2xl p-5 relative overflow-hidden" style={{ background: `linear-gradient(120deg, ${deliverySettings.bannerColor1}, ${deliverySettings.bannerColor2})` }}>
           <FestiveSparkles />
@@ -1108,6 +1125,7 @@ function HomePage({ products, nav, onAdd, cart, area, categories, deliverySettin
       <button onClick={() => nav('about')} className="w-full mt-7 py-3.5 flex items-center justify-center gap-1.5" style={{ borderTop: `1px solid ${COLORS.border}`, color: COLORS.inkSoft, fontFamily: bodyFont, fontSize: 12, fontWeight: 600 }}>
         {t('aboutUsContact')} <ChevronRight size={14} />
       </button>
+      </div>
     </div>
   );
 }
