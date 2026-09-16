@@ -637,9 +637,11 @@ function ProductCard({ product, onOpen, onAdd, qty, isWishlisted, onToggleWishli
   return (
     <div
       className="rounded-2xl overflow-hidden flex flex-col cursor-pointer"
-      style={{ background: currentTheme === 'dark' ? COLORS.card : 'rgba(255,255,255,0.62)', backdropFilter: currentTheme === 'dark' ? undefined : 'blur(6px)', WebkitBackdropFilter: currentTheme === 'dark' ? undefined : 'blur(6px)', border: `1px solid ${COLORS.border}`, minWidth: cardW, width: cardW }}
+      style={{ position: 'relative', background: currentTheme === 'dark' ? COLORS.card : 'rgba(255,255,255,0.5)', border: `1px solid ${currentTheme === 'dark' ? COLORS.border : 'rgba(255,255,255,0.7)'}`, boxShadow: currentTheme === 'dark' ? 'none' : 'inset 0 1px 0 rgba(255,255,255,0.9), 0 4px 14px rgba(0,0,0,0.05)', minWidth: cardW, width: cardW }}
       onClick={() => onOpen(product)}
     >
+      <div className="absolute inset-0" style={{ pointerEvents: 'none', zIndex: 2, background: currentTheme === 'dark' ? 'linear-gradient(180deg, rgba(255,255,255,0.10) 0%, transparent 40%)' : 'linear-gradient(180deg, rgba(255,255,255,0.65) 0%, transparent 40%)' }} />
+      <div className="absolute inset-0" style={{ pointerEvents: 'none', zIndex: 2, boxShadow: `inset 1px 0 0 ${currentTheme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.55)'}, inset -1px 0 0 ${currentTheme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.55)'}` }} />
       <div className="relative flex items-center justify-center" style={{ height: imgH, background: product.imageUrl ? '#fff' : `linear-gradient(135deg, ${product.g1}, ${product.g2})` }}>
         {product.imageUrl ? (
           <img src={product.imageUrl} alt={product.name} className="w-full h-full" style={{ objectFit: 'cover' }} loading="lazy" decoding="async" />
@@ -686,6 +688,9 @@ function ProductCard({ product, onOpen, onAdd, qty, isWishlisted, onToggleWishli
         </div>
         {qty > 0 && <span className="text-center" style={{ fontSize: 10.5, color: COLORS.secondary, fontFamily: bodyFont, fontWeight: 700 }}>{qty} in cart</span>}
       </div>
+      {currentTheme !== 'dark' && (
+        <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(120deg, rgba(255,255,255,0) 20%, rgba(255,255,255,0.35) 38%, rgba(255,255,255,0.04) 55%)' }} />
+      )}
     </div>
   );
 }
@@ -950,30 +955,41 @@ function BottomNav({ page, nav, cartCount }) {
     <div
       className="fixed bottom-4 left-1/2 z-30 flex items-stretch"
       style={{
-        transform: 'translateX(-50%)', width: 'calc(100% - 32px)', maxWidth: 416,
-        background: currentTheme === 'dark' ? 'rgba(30,26,20,0.16)' : 'rgba(255,255,255,0.14)',
-        backdropFilter: 'blur(10px) saturate(160%)', WebkitBackdropFilter: 'blur(10px) saturate(160%)',
-        border: `1px solid ${currentTheme === 'dark' ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.55)'}`,
+        transform: 'translateX(-50%)', width: 'calc(100% - 72px)', maxWidth: 340,
+        overflow: 'hidden', position: 'relative',
+        background: currentTheme === 'dark'
+          ? 'linear-gradient(160deg, rgba(255,255,255,0.10), rgba(30,26,20,0.22) 60%)'
+          : 'linear-gradient(160deg, rgba(255,255,255,0.55), rgba(255,255,255,0.18) 60%)',
+        border: `1px solid ${currentTheme === 'dark' ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.8)'}`,
         borderRadius: 999,
-        boxShadow: `0 8px 28px rgba(0,0,0,0.16), inset 0 1px 0 ${currentTheme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.7)'}`,
+        boxShadow: [
+          '0 10px 30px rgba(0,0,0,0.16)',
+          '0 1px 2px rgba(0,0,0,0.06)',
+          `inset 0 1.5px 0 ${currentTheme === 'dark' ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.95)'}`,
+          `inset 0 -1.5px 0 rgba(0,0,0,0.05)`,
+          `inset 1px 0 0 ${currentTheme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.5)'}`,
+          `inset -1px 0 0 ${currentTheme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.5)'}`,
+        ].join(', '),
       }}
     >
+      <div className="absolute inset-0" style={{ pointerEvents: 'none', background: `linear-gradient(180deg, ${currentTheme === 'dark' ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.6)'} 0%, transparent 55%)` }} />
       {items.map((it) => {
         const active = page === it.id || (it.id === 'admin' && page.startsWith('admin'));
         return (
-          <button key={it.id} onClick={() => nav(it.id)} className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 relative">
+          <button key={it.id} onClick={() => nav(it.id)} className="flex-1 flex flex-col items-center justify-center gap-0.5 py-1.5 relative">
             <div className="relative">
-              <it.Icon size={19} color={active ? COLORS.primary : COLORS.inkSoft} strokeWidth={active ? 2.4 : 2} />
+              <it.Icon size={16} color={active ? COLORS.primary : COLORS.inkSoft} strokeWidth={active ? 2.4 : 2} />
               {!!it.badge && (
-                <span className="absolute rounded-full flex items-center justify-center" style={{ top: -6, right: -8, minWidth: 15, height: 15, background: COLORS.danger, color: '#fff', fontSize: 9, fontWeight: 700, fontFamily: bodyFont, padding: '0 3px' }}>
+                <span className="absolute rounded-full flex items-center justify-center" style={{ top: -5, right: -7, minWidth: 13, height: 13, background: COLORS.danger, color: '#fff', fontSize: 8, fontWeight: 700, fontFamily: bodyFont, padding: '0 2px' }}>
                   {it.badge}
                 </span>
               )}
             </div>
-            <span style={{ fontSize: 9.5, fontFamily: bodyFont, fontWeight: active ? 700 : 500, color: active ? COLORS.primary : COLORS.inkSoft }}>{it.label}</span>
+            <span style={{ fontSize: 8, fontFamily: bodyFont, fontWeight: active ? 700 : 500, color: active ? COLORS.primary : COLORS.inkSoft }}>{it.label}</span>
           </button>
         );
       })}
+      <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(115deg, rgba(255,255,255,0) 25%, rgba(255,255,255,0.4) 42%, rgba(255,255,255,0.05) 58%)' }} />
     </div>
   );
 }
@@ -1186,7 +1202,7 @@ function ProductPage({ product, nav, onAdd, onBuyNow, qty, reviews = [], onAddRe
 
   return (
     <div className="pb-32">
-      <div className="relative flex items-center justify-center" style={{ height: 240, background: product.imageUrl ? '#fff' : `linear-gradient(135deg, ${product.g1}, ${product.g2})` }}>
+      <div className="relative flex items-center justify-center" style={{ height: 240, overflow: 'hidden', background: product.imageUrl ? '#fff' : `linear-gradient(135deg, ${product.g1}, ${product.g2})` }}>
         {product.imageUrl ? (
           <img src={product.imageUrl} alt={product.name} className="w-full h-full" style={{ objectFit: 'cover', cursor: 'zoom-in' }} onClick={() => setShowFullImage(true)} />
         ) : (
@@ -1216,6 +1232,7 @@ function ProductPage({ product, nav, onAdd, onBuyNow, qty, reviews = [], onAddRe
         >
           <Share2 size={17} color={COLORS.inkSoft} />
         </button>
+        <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(120deg, rgba(255,255,255,0) 22%, rgba(255,255,255,0.3) 40%, rgba(255,255,255,0.03) 58%)' }} />
       </div>
 
       {showFullImage && product.imageUrl && (
