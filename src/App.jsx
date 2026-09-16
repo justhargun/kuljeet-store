@@ -640,7 +640,7 @@ function ProductCard({ product, onOpen, onAdd, qty, isWishlisted, onToggleWishli
       style={{ position: 'relative', background: currentTheme === 'dark' ? COLORS.card : 'rgba(255,255,255,0.5)', border: `1px solid ${currentTheme === 'dark' ? COLORS.border : 'rgba(255,255,255,0.7)'}`, boxShadow: currentTheme === 'dark' ? 'none' : 'inset 0 1px 0 rgba(255,255,255,0.9), 0 4px 14px rgba(0,0,0,0.05)', minWidth: cardW, width: cardW }}
       onClick={() => onOpen(product)}
     >
-      <div className="absolute inset-0" style={{ pointerEvents: 'none', zIndex: 2, background: currentTheme === 'dark' ? 'linear-gradient(180deg, rgba(255,255,255,0.10) 0%, transparent 40%)' : 'linear-gradient(180deg, rgba(255,255,255,0.65) 0%, transparent 40%)' }} />
+      <div className="absolute" style={{ top: imgH, left: 0, right: 0, bottom: 0, pointerEvents: 'none', zIndex: 2, background: currentTheme === 'dark' ? 'linear-gradient(180deg, rgba(255,255,255,0.08) 0%, transparent 60%)' : 'linear-gradient(180deg, rgba(255,255,255,0.5) 0%, transparent 60%)' }} />
       <div className="absolute inset-0" style={{ pointerEvents: 'none', zIndex: 2, boxShadow: `inset 1px 0 0 ${currentTheme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.55)'}, inset -1px 0 0 ${currentTheme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.55)'}` }} />
       <div className="relative flex items-center justify-center" style={{ height: imgH, background: product.imageUrl ? '#fff' : `linear-gradient(135deg, ${product.g1}, ${product.g2})` }}>
         {product.imageUrl ? (
@@ -953,10 +953,10 @@ function BottomNav({ page, nav, cartCount }) {
   ];
   return (
     <div
-      className="fixed bottom-4 left-1/2 z-30 flex items-stretch"
+      className="fixed bottom-4 left-1/2 flex items-stretch"
       style={{
         transform: 'translateX(-50%)', width: 'calc(100% - 72px)', maxWidth: 340,
-        overflow: 'hidden', position: 'relative',
+        overflow: 'hidden', zIndex: 60,
         background: currentTheme === 'dark'
           ? 'linear-gradient(160deg, rgba(255,255,255,0.10), rgba(30,26,20,0.22) 60%)'
           : 'linear-gradient(160deg, rgba(255,255,255,0.55), rgba(255,255,255,0.18) 60%)',
