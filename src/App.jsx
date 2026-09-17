@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Search, MapPin, ShoppingCart, Home, LayoutGrid, Package, Star, Plus, Minus,
-  Check, ChevronRight, ChevronDown, X, Sparkles, Droplet, Droplets, AlertTriangle,
+  Check, ChevronRight, ChevronDown, X, Sparkles, Droplet, Droplets, AlertTriangle, RefreshCw,
   Wind, Heart, Palette, Baby, Sun, Tag, Lock, Truck, CreditCard, Banknote,
   MessageCircle, Trash2, PlusCircle, BarChart3, Users,
   ClipboardList, AlertCircle, CheckCircle2, ArrowLeft,
@@ -466,6 +466,7 @@ function mapDeliveryFromDb(row, pinRows) {
     openTime: row.open_time || '09:00',
     closeTime: row.close_time || '21:00',
     manuallyClosed: !!row.manually_closed,
+    closedDays: Array.isArray(row.closed_days) ? row.closed_days : [],
     announcementEnabled: !!row.announcement_enabled, announcementText: row.announcement_text || '',
     productsSeeded: !!row.products_seeded,
     adminPassword: row.admin_password || 'admin123',
@@ -549,6 +550,7 @@ const SEED_DELIVERY = {
   openTime: '09:00',
   closeTime: '21:00',
   manuallyClosed: false,
+  closedDays: [],
   announcementEnabled: false,
   announcementText: '',
   productsSeeded: false,
@@ -591,6 +593,7 @@ function formatTime12(t) {
 }
 function isShopOpen(settings) {
   if (settings.manuallyClosed) return false;
+  if (settings.closedDays && settings.closedDays.includes(new Date().getDay())) return false;
   if (!settings.openTime || !settings.closeTime) return true;
   const [oh, om] = settings.openTime.split(':').map(Number);
   const [ch, cm] = settings.closeTime.split(':').map(Number);
@@ -652,6 +655,55 @@ function FestiveSparkles({ count = 9 }) {
           {i % 3 === 0 ? '\u2728' : i % 3 === 1 ? '\u2b50' : '\u2726'}
         </span>
       ))}
+    </div>
+  );
+}
+
+function SwipeToDelete({ onDelete, children, borderRadius = 16, revealWidth = 76 }) {
+  const [dragX, setDragX] = useState(0);
+  const [open, setOpen] = useState(false);
+  const draggingRef = useRef(false);
+  const startXRef = useRef(0);
+  const startedOpenRef = useRef(false);
+  const REVEAL = revealWidth;
+
+  const onPointerDown = (e) => {
+    draggingRef.current = true;
+    startedOpenRef.current = open;
+    startXRef.current = e.clientX;
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+  };
+  const onPointerMove = (e) => {
+    if (!draggingRef.current) return;
+    const delta = e.clientX - startXRef.current;
+    const base = startedOpenRef.current ? -REVEAL : 0;
+    const next = Math.max(-REVEAL, Math.min(0, base + delta));
+    setDragX(next);
+  };
+  const endDrag = () => {
+    if (!draggingRef.current) return;
+    draggingRef.current = false;
+    const shouldOpen = dragX < -REVEAL / 2;
+    setOpen(shouldOpen);
+    setDragX(shouldOpen ? -REVEAL : 0);
+  };
+
+  return (
+    <div className="relative overflow-hidden" style={{ borderRadius, touchAction: 'pan-y' }}>
+      <div className="absolute inset-y-0 right-0 flex items-center justify-center" style={{ width: REVEAL, background: COLORS.danger }}>
+        <button onClick={() => { setOpen(false); setDragX(0); onDelete(); }} className="flex flex-col items-center gap-0.5">
+          <Trash2 size={16} color="#fff" />
+        </button>
+      </div>
+      <div
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        style={{ transform: `translateX(${dragX}px)`, transition: draggingRef.current ? 'none' : 'transform 0.2s ease', background: COLORS.bg }}
+      >
+        {children}
+      </div>
     </div>
   );
 }
@@ -807,7 +859,7 @@ function Rail({ products, onOpen, onAdd, cart, wishlist, onToggleWishlist, size 
 }
 
 /* --------------------------------- HEADER / NAV --------------------------------- */
-function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack, title, shopName, products = [], nav, categories = [], deliverySettings, theme, setTheme, lang, setLang: setLangProp }) {
+function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack, title, shopName, products = [], nav, categories = [], deliverySettings, theme, setTheme, lang, setLang: setLangProp, bgStyle, setBgStyle }) {
   const [focused, setFocused] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [searchHistory, setSearchHistory] = useState([]);
@@ -834,14 +886,14 @@ function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack
 
   if (title) {
     return (
-      <div className="sticky top-0 z-20 flex items-center gap-3 px-4 py-3" style={{ background: theme === 'dark' ? COLORS.bg : '#FFF3B0', borderBottom: `1px solid ${COLORS.border}` }}>
+      <div className={`sticky top-0 z-20 flex items-center gap-3 px-4 py-3 ${theme !== 'dark' && bgStyle !== 'classic' ? 'rainbow-bg' : ''}`} style={{ background: theme === 'dark' ? COLORS.bg : bgStyle === 'classic' ? '#FFF3B0' : undefined, borderBottom: `1px solid ${COLORS.border}` }}>
         <button onClick={onBack}><ArrowLeft size={20} color={COLORS.ink} /></button>
         <h1 style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 17, color: COLORS.ink }}>{title}</h1>
       </div>
     );
   }
   return (
-    <div className="sticky top-0 z-20" style={{ background: theme === 'dark' ? COLORS.bg : '#FFF3B0', borderBottom: `1px solid ${COLORS.border}` }}>
+    <div className={`sticky top-0 z-20 ${theme !== 'dark' && bgStyle !== 'classic' ? 'rainbow-bg' : ''}`} style={{ background: theme === 'dark' ? COLORS.bg : bgStyle === 'classic' ? '#FFF3B0' : undefined, borderBottom: `1px solid ${COLORS.border}` }}>
       <div className="flex items-center justify-between px-4 pt-3">
         <div className="flex items-center gap-2">
           <div>
@@ -901,6 +953,11 @@ function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack
           {setTheme && (
             <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="flex items-center justify-center rounded-full" style={{ width: 30, height: 30, background: 'transparent', border: `1px solid ${COLORS.border}` }}>
               {theme === 'dark' ? <Sun size={14} color={COLORS.gold} /> : <Moon size={14} color={COLORS.secondary} />}
+            </button>
+          )}
+          {setBgStyle && (
+            <button onClick={() => setBgStyle(bgStyle === 'classic' ? 'rainbow' : 'classic')} className="flex items-center justify-center rounded-full" style={{ width: 30, height: 30, background: 'transparent', border: `1px solid ${COLORS.border}` }}>
+              {bgStyle === 'classic' ? <Sparkles size={14} color={COLORS.rose} /> : <Palette size={14} color={COLORS.gold} />}
             </button>
           )}
           <button onClick={onChangeLocation} className="flex items-center gap-1 px-2.5 py-1.5 rounded-full" style={{ background: 'transparent', border: `1px solid ${COLORS.border}` }}>
@@ -1327,11 +1384,16 @@ function WishlistPage({ products, wishlist, nav, onAdd, cart, onToggleWishlist }
           <button onClick={() => nav('home')} className="mt-2 px-4 py-2 rounded-full" style={{ background: 'transparent', border: `1.5px solid ${COLORS.primary}`, color: COLORS.ink, fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>{t('browseProducts')}</button>
         </div>
       ) : (
+        <>
         <div className="grid grid-cols-2 gap-3">
           {saved.map((p) => (
-            <ProductCard key={p.id} product={p} onOpen={(pr) => nav('product', { id: pr.id })} onAdd={onAdd} qty={cart[p.id] || 0} isWishlisted={true} onToggleWishlist={onToggleWishlist} />
+            <SwipeToDelete key={p.id} onDelete={() => onToggleWishlist(p.id)} borderRadius={16} revealWidth={52}>
+              <ProductCard product={p} onOpen={(pr) => nav('product', { id: pr.id })} onAdd={onAdd} qty={cart[p.id] || 0} isWishlisted={true} onToggleWishlist={onToggleWishlist} />
+            </SwipeToDelete>
           ))}
         </div>
+        <p className="text-center" style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft, marginTop: 10 }}>Swipe an item left to remove it</p>
+        </>
       )}
     </div>
   );
@@ -1598,7 +1660,8 @@ function CartPage({ cartItems, updateQty, removeItem, subtotal, nav, products = 
       </div>
       <div className="p-4 flex flex-col gap-3">
         {cartItems.map((item) => (
-          <div key={item.id} className="flex gap-3 p-3 rounded-2xl" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+          <SwipeToDelete key={item.id} onDelete={() => removeItem(item.id)} borderRadius={16}>
+          <div className="flex gap-3 p-3" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
             <div className="rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden" style={{ width: 56, height: 56, background: item.imageUrl ? '#fff' : `linear-gradient(135deg, ${item.g1}, ${item.g2})` }}>
               {item.imageUrl ? <img src={item.imageUrl} alt={item.name} className="w-full h-full" style={{ objectFit: 'cover' }} /> : <span style={{ fontSize: 24 }}>{item.emoji}</span>}
             </div>
@@ -1614,7 +1677,6 @@ function CartPage({ cartItems, updateQty, removeItem, subtotal, nav, products = 
                 {item.qty >= (item.stock ?? Infinity) && (
                   <span style={{ fontFamily: bodyFont, fontSize: 10, color: COLORS.inkSoft }}>{t('maxInStock')}</span>
                 )}
-                <button onClick={() => removeItem(item.id)}><Trash2 size={14} color={COLORS.danger} /></button>
               </div>
               {item.bulkMinQty && item.bulkDiscountPercent && (
                 <p style={{ fontFamily: bodyFont, fontSize: 10, color: item.qty >= item.bulkMinQty ? COLORS.secondary : COLORS.inkSoft, marginTop: 4, fontWeight: item.qty >= item.bulkMinQty ? 700 : 500 }}>
@@ -1624,8 +1686,10 @@ function CartPage({ cartItems, updateQty, removeItem, subtotal, nav, products = 
             </div>
             <span style={{ fontFamily: monoFont, fontSize: 12.5, fontWeight: 700, color: COLORS.ink }}>{money(bulkLineTotal(item))}</span>
           </div>
+          </SwipeToDelete>
         ))}
       </div>
+      <p className="text-center" style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft, marginTop: -4 }}>Swipe an item left to remove it</p>
       <div className="fixed left-0 right-0 flex justify-center z-40" style={{ bottom: 58 }}>
         <div className="w-full p-4 rounded-t-2xl" style={{ background: COLORS.card, borderTop: `1px solid ${COLORS.border}`, maxWidth: 448, boxShadow: '0 -6px 18px rgba(43,32,19,0.10)' }}>
           <div className="flex items-center justify-between mb-3">
@@ -2096,6 +2160,15 @@ function AboutPage({ deliverySettings, nav }) {
             </div>
             <ChevronRight size={16} color={COLORS.inkSoft} />
           </button>
+          <button onClick={() => nav('returns')} className="flex items-center gap-3 rounded-xl p-3.5 text-left" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+            <div className="rounded-full flex items-center justify-center" style={{ width: 36, height: 36, background: `${COLORS.gold}1A` }}>
+              <RefreshCw size={17} color={COLORS.gold} />
+            </div>
+            <div className="flex-1">
+              <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>Returns &amp; Refunds</p>
+            </div>
+            <ChevronRight size={16} color={COLORS.inkSoft} />
+          </button>
         </div>
       </div>
     </div>
@@ -2103,6 +2176,39 @@ function AboutPage({ deliverySettings, nav }) {
 }
 
 /* ---------------------------------- ADMIN ---------------------------------- */
+function ReturnsPage({ deliverySettings }) {
+  const shopName = deliverySettings.shopName || 'Kuljeet Store';
+  return (
+    <div className="p-4 pb-10 flex flex-col gap-5">
+      <p style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft }}>Last updated: {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+
+      <LegalSection heading="1. Contacting Us About a Return">
+        <p>If something&apos;s wrong with your order &mdash; damaged, incorrect, or missing items &mdash; message us on WhatsApp within 48 hours of delivery with your order ID and photos of the item. We&apos;ll sort it out from there, usually with a replacement or a refund.</p>
+      </LegalSection>
+
+      <LegalSection heading="2. Eligibility">
+        <p>To be eligible for a return, an item generally needs to be unused, in its original packaging, and reported within 48 hours of delivery. Items showing signs of use, or reported well after delivery, may not be eligible &mdash; but reach out to us anyway and we&apos;ll look at it case by case.</p>
+      </LegalSection>
+
+      <LegalSection heading="3. Non-Returnable Items">
+        <p>For hygiene reasons, certain items like opened cosmetics, perishables, and personal-care products generally can&apos;t be returned unless they arrived damaged, defective, or incorrect.</p>
+      </LegalSection>
+
+      <LegalSection heading="4. Refunds">
+        <p>Once we&apos;ve confirmed a return or an issue with your order, refunds are processed back to your original payment method (or via UPI transfer, if that&apos;s easier) within a few working days. If you paid cash on delivery, we&apos;ll arrange the refund with you directly.</p>
+      </LegalSection>
+
+      <LegalSection heading="5. Cancellations">
+        <p>You can cancel an order by messaging us on WhatsApp as soon as possible &mdash; we can usually accommodate this if the order hasn&apos;t been packed or dispatched yet. Once an order is out for delivery, it generally can&apos;t be cancelled, but you&apos;re welcome to refuse it at the door.</p>
+      </LegalSection>
+
+      <LegalSection heading="6. Questions">
+        <p>For anything not covered here, or if you&apos;re unsure whether your situation qualifies, just message us on WhatsApp &mdash; we&apos;re happy to help sort it out. This policy is part of {shopName}&apos;s Terms &amp; Conditions.</p>
+      </LegalSection>
+    </div>
+  );
+}
+
 function LegalSection({ heading, children }) {
   return (
     <div>
@@ -2823,6 +2929,42 @@ function QuickViewModal({ product, onClose, onAdd, nav, wishlist, onToggleWishli
   );
 }
 
+function CatalogPrintView({ products, deliverySettings, categories, onClose }) {
+  const categoryName = (id) => (categories.find((c) => c.id === id) || {}).name || id;
+  const sorted = [...products].sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
+
+  return (
+    <div className="fixed inset-0 flex justify-center" style={{ background: 'rgba(0,0,0,0.4)', zIndex: 9999 }}>
+      <div className="w-full flex flex-col" style={{ maxWidth: 448, maxHeight: '100vh', overflowY: 'auto', background: '#fff' }}>
+        <div className="flex items-center justify-between px-4 py-3 no-print" style={{ borderBottom: '1px solid #eee', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
+          <span style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 14, color: '#1a1a1a' }}>Product Catalog</span>
+          <div className="flex gap-2">
+            <button onClick={() => window.print()} className="px-3 py-1.5 rounded-full" style={{ background: '#1a1a1a', color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 11.5 }}>Print / Save PDF</button>
+            <button onClick={onClose} className="px-3 py-1.5 rounded-full" style={{ border: '1px solid #ddd', fontFamily: bodyFont, fontWeight: 700, fontSize: 11.5, color: '#1a1a1a' }}>Close</button>
+          </div>
+        </div>
+        <div className="p-6" style={{ color: '#1a1a1a' }}>
+          <p style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 20 }}>{deliverySettings.shopName}</p>
+          <p style={{ fontFamily: bodyFont, fontSize: 11, color: '#666', marginTop: 2, whiteSpace: 'pre-line' }}>{deliverySettings.shopArea}</p>
+          <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: '#999', marginTop: 2 }}>Catalog generated {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })} \u2014 {sorted.length} products</p>
+          <div className="mt-5" style={{ borderTop: '1px solid #eee' }}>
+            {sorted.map((p) => (
+              <div key={p.id} className="flex items-center justify-between py-2.5" style={{ borderBottom: '1px solid #eee' }}>
+                <div className="flex-1 min-w-0" style={{ paddingRight: 10 }}>
+                  <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>{p.name}{p.quantity ? ` (${p.quantity})` : ''}</p>
+                  <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: '#888' }}>{categoryName(p.category)} \u00b7 {p.stock === 0 ? 'Out of stock' : `${p.stock} in stock`}</p>
+                </div>
+                <p style={{ fontFamily: monoFont, fontWeight: 700, fontSize: 12.5, flexShrink: 0 }}>{money(p.price)}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      <style>{`@media print { .no-print { display: none !important; } }`}</style>
+    </div>
+  );
+}
+
 function InvoiceOverlay({ order, deliverySettings, onClose }) {
   const gst = deliverySettings.gstNumber;
   // navigator.standalone is a legacy Apple-only flag that is true ONLY for an
@@ -3054,12 +3196,13 @@ function AdminOverview({ products, salesLog, onRefresh, onViewInvoice }) {
   );
 }
 
-function AdminProducts({ products, setProducts, categories, customCategories, setCustomCategories }) {
+function AdminProducts({ products, setProducts, categories, customCategories, setCustomCategories, deliverySettings }) {
   const [showAdd, setShowAdd] = useState(false);
   const [showCats, setShowCats] = useState(false);
   const [showBulk, setShowBulk] = useState(false);
   const [importMsg, setImportMsg] = useState('');
   const [optimizing, setOptimizing] = useState(false);
+  const [showCatalog, setShowCatalog] = useState(false);
   const [optimizeMsg, setOptimizeMsg] = useState('');
   const [deleteError, setDeleteError] = useState('');
   const fileInputRef = useRef(null);
@@ -3285,6 +3428,11 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
         </div>
       )}
 
+      <button onClick={() => setShowCatalog(true)} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl mb-4" style={{ border: `1.5px solid ${COLORS.ink}`, color: COLORS.ink }}>
+        <FileText size={15} /> <span style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 13 }}>Download Product Catalog (PDF)</span>
+      </button>
+      {showCatalog && <CatalogPrintView products={products} deliverySettings={deliverySettings} categories={categories} onClose={() => setShowCatalog(false)} />}
+
       <div className="rounded-2xl p-4 mb-4 flex flex-col gap-2.5" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
         <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>Speed Up My Store</p>
         <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft, lineHeight: 1.5 }}>
@@ -3488,7 +3636,7 @@ function AdminDelivery({ settings, setSettings, categories }) {
         shop_name: local.shopName, shop_area: local.shopArea, shop_pincode: local.shopPincode, mode: local.mode, gst_number: local.gstNumber || null, maps_link: local.mapsLink || null,
         radius_km: local.radiusKm, min_order_value: local.minOrderValue, delivery_charge: local.deliveryCharge,
         free_delivery_threshold: local.freeDeliveryThreshold, whatsapp_number: local.whatsappNumber, upi_id: local.upiId,
-        open_time: local.openTime, close_time: local.closeTime, manually_closed: local.manuallyClosed,
+        open_time: local.openTime, close_time: local.closeTime, manually_closed: local.manuallyClosed, closed_days: local.closedDays || [],
         announcement_enabled: local.announcementEnabled, announcement_text: local.announcementText || null,
         banner_enabled: local.bannerEnabled, banner_title: local.bannerTitle, banner_subtitle: local.bannerSubtitle,
         banner_cta: local.bannerCta, banner_category: local.bannerCategory, banner_emoji: local.bannerEmoji,
@@ -3604,6 +3752,27 @@ function AdminDelivery({ settings, setSettings, categories }) {
           </label>
         </div>
         <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft }}>Outside these hours the store shows as &ldquo;Closed&rdquo; to customers and new orders can&rsquo;t be placed.</p>
+        <div>
+          <span style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft, fontWeight: 700 }}>Closed on these days every week</span>
+          <div className="flex gap-1.5 mt-1.5 flex-wrap">
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((label, i) => {
+              const active = (local.closedDays || []).includes(i);
+              return (
+                <button
+                  key={i}
+                  onClick={() => {
+                    const cur = local.closedDays || [];
+                    setLocal({ ...local, closedDays: active ? cur.filter((d) => d !== i) : [...cur, i] });
+                  }}
+                  className="px-3 py-1.5 rounded-full"
+                  style={{ background: active ? COLORS.danger : 'transparent', color: active ? '#fff' : COLORS.ink, border: `1px solid ${active ? COLORS.danger : COLORS.border}`, fontFamily: bodyFont, fontWeight: 700, fontSize: 11.5 }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       <div className="rounded-2xl p-4 flex flex-col gap-3" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
@@ -3705,6 +3874,26 @@ function AdminDelivery({ settings, setSettings, categories }) {
         {field('Minimum order value (\u20b9)', local.minOrderValue, (e) => setLocal({ ...local, minOrderValue: Number(e.target.value.replace(/\D/g, '')) || 0 }), true)}
         {field('Delivery charge (\u20b9)', local.deliveryCharge, (e) => setLocal({ ...local, deliveryCharge: Number(e.target.value.replace(/\D/g, '')) || 0 }), true)}
         {field('Free delivery above (\u20b9)', local.freeDeliveryThreshold, (e) => setLocal({ ...local, freeDeliveryThreshold: Number(e.target.value.replace(/\D/g, '')) || 0 }), true)}
+      </div>
+
+      <div className="rounded-2xl p-4 flex flex-col items-center gap-3" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+        <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink, alignSelf: 'flex-start' }}>Store QR Code</p>
+        <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft, alignSelf: 'flex-start', lineHeight: 1.5 }}>Print this and put it up in your shop \u2014 customers scan it to open your store instantly.</p>
+        <img
+          src={`https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(window.location.origin)}`}
+          alt="Store QR code"
+          width={200} height={200}
+          className="rounded-xl"
+          style={{ border: `1px solid ${COLORS.border}` }}
+        />
+        <a
+          href={`https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(window.location.origin)}`}
+          target="_blank" rel="noreferrer"
+          className="px-4 py-2 rounded-full"
+          style={{ border: `1px solid ${COLORS.primary}`, color: COLORS.primary, fontFamily: bodyFont, fontWeight: 700, fontSize: 11.5 }}
+        >
+          Open Full-Size to Save/Print
+        </a>
       </div>
 
       <AdminCoupons />
@@ -4003,7 +4192,7 @@ function AdminPage({ products, setProducts, salesLog, refreshSalesLog, onViewInv
       </div>
       <AdminTabs tab={tab} setTab={setTab} />
       {tab === 'overview' && <AdminOverview products={products} salesLog={salesLog} onRefresh={refreshSalesLog} onViewInvoice={onViewInvoice} />}
-      {tab === 'products' && <AdminProducts products={products} setProducts={setProducts} categories={allRealCategories} customCategories={customCategories} setCustomCategories={setCustomCategories} />}
+      {tab === 'products' && <AdminProducts products={products} setProducts={setProducts} categories={allRealCategories} customCategories={customCategories} setCustomCategories={setCustomCategories} deliverySettings={deliverySettings} />}
       {tab === 'delivery' && <AdminDelivery settings={deliverySettings} setSettings={setDeliverySettings} categories={allRealCategories} />}
       {tab === 'customers' && <AdminCustomers salesLog={salesLog} />}
       {tab === 'security' && <AdminSecurity adminPassword={adminPassword} setAdminPassword={setAdminPassword} adminEmail={adminEmail} />}
@@ -4015,6 +4204,7 @@ function AdminPage({ products, setProducts, salesLog, refreshSalesLog, onViewInv
 export default function App() {
   const [loaded, setLoaded] = useState(false);
   const [theme, setTheme] = useState('light');
+  const [bgStyle, setBgStyle] = useState('classic');
   const [lang, setLangState] = useState('en');
   setLang(lang); // mutate the shared currentLang before this render's JSX reads it via t()
   const [deliverySettings, setDeliverySettings] = useState(SEED_DELIVERY);
@@ -4064,15 +4254,17 @@ export default function App() {
           window.storage.get('mm-admin-pw'),
           window.storage.get('mm-custom-categories'),
           window.storage.get('mm-theme'),
+          window.storage.get('mm-bg-style'),
           window.storage.get('mm-wishlist'),
           window.storage.get('mm-lang'),
         ]);
-        const [c, loc, pw, cc, th, wl, lg] = results.map((r) => (r.status === 'fulfilled' ? r.value : null));
+        const [c, loc, pw, cc, th, bs, wl, lg] = results.map((r) => (r.status === 'fulfilled' ? r.value : null));
         if (c && c.value) setCart(JSON.parse(c.value));
         if (loc && loc.value) { setDeliveryArea(loc.value); setShowLocationModal(false); }
         if (pw && pw.value) setAdminPassword(pw.value);
         if (cc && cc.value) setCustomCategories(JSON.parse(cc.value));
         if (th && th.value) setTheme(th.value);
+        if (bs && bs.value) setBgStyle(bs.value);
         if (wl && wl.value) setWishlist(JSON.parse(wl.value));
         if (lg && lg.value) setLangState(lg.value);
       } catch (e) { /* keep defaults */ }
@@ -4192,6 +4384,7 @@ export default function App() {
   }, [adminPassword, loaded]);
   useEffect(() => { if (loaded) window.storage.set('mm-custom-categories', JSON.stringify(customCategories)).catch(() => {}); }, [customCategories, loaded]);
   useEffect(() => { if (loaded) window.storage.set('mm-theme', theme).catch(() => {}); }, [theme, loaded]);
+  useEffect(() => { if (loaded) window.storage.set('mm-bg-style', bgStyle).catch(() => {}); }, [bgStyle, loaded]);
   useEffect(() => { if (loaded) window.storage.set('mm-lang', lang).catch(() => {}); }, [lang, loaded]);
   useEffect(() => {
     if (!BACKEND_ENABLED || !isAdmin) return;
@@ -4347,7 +4540,7 @@ export default function App() {
 
   const isAdminRoute = route.page === 'admin';
   const showHeader = !isAdminRoute && route.page !== 'product' && route.page !== 'checkout';
-  const showBackHeader = route.page === 'category' || route.page === 'product' || route.page === 'checkout' || route.page === 'list' || route.page === 'about' || route.page === 'terms' || route.page === 'privacy' || route.page === 'faq' || route.page === 'profile' || route.page === 'my-orders' || route.page === 'game' || route.page === 'contact';
+  const showBackHeader = route.page === 'category' || route.page === 'product' || route.page === 'checkout' || route.page === 'list' || route.page === 'about' || route.page === 'terms' || route.page === 'privacy' || route.page === 'faq' || route.page === 'profile' || route.page === 'my-orders' || route.page === 'game' || route.page === 'contact' || route.page === 'returns';
 
   const headerTitleMap = {
     category: allCategories.find((c) => c.id === route.params.id)?.name,
@@ -4362,11 +4555,12 @@ export default function App() {
     'my-orders': t('myOrders'),
     game: 'Catch the Products',
     contact: 'Contact Us',
+    returns: 'Returns & Refunds',
   };
 
   if (!loaded) {
     return (
-      <div className={`min-h-screen flex items-center justify-center ${theme !== 'dark' ? 'rainbow-bg' : ''}`} style={{ background: theme === 'dark' ? COLORS.bg : undefined }}>
+      <div className={`min-h-screen flex items-center justify-center ${theme !== 'dark' && bgStyle !== 'classic' ? 'rainbow-bg' : ''}`} style={{ background: theme === 'dark' ? COLORS.bg : bgStyle === 'classic' ? 'linear-gradient(180deg, #FFF3B0 0%, #FBF6EC 600px)' : undefined }}>
         <p style={{ fontFamily: displayFont, fontStyle: 'italic', fontSize: 18, color: COLORS.ink }}>Loading Kuljeet Store&hellip;</p>
       </div>
     );
@@ -4374,8 +4568,8 @@ export default function App() {
 
   return (
     <>
-    <div className={`min-h-screen flex justify-center app-shell ${theme !== 'dark' ? 'rainbow-bg' : ''}`} style={{ background: theme === 'dark' ? COLORS.bg : undefined, fontFamily: bodyFont }}>
-      <div className={`w-full flex flex-col ${theme !== 'dark' ? 'rainbow-bg' : ''}`} style={{ maxWidth: 448, minHeight: '100vh', background: theme === 'dark' ? COLORS.bg : undefined, boxShadow: '0 0 40px rgba(0,0,0,0.06)' }}>
+    <div className={`min-h-screen flex justify-center app-shell ${theme !== 'dark' && bgStyle !== 'classic' ? 'rainbow-bg' : ''}`} style={{ background: theme === 'dark' ? COLORS.bg : bgStyle === 'classic' ? 'linear-gradient(180deg, #FFF3B0 0%, #FBF6EC 600px)' : undefined, fontFamily: bodyFont }}>
+      <div className={`w-full flex flex-col ${theme !== 'dark' && bgStyle !== 'classic' ? 'rainbow-bg' : ''}`} style={{ maxWidth: 448, minHeight: '100vh', background: theme === 'dark' ? COLORS.bg : bgStyle === 'classic' ? 'linear-gradient(180deg, #FFF3B0 0%, #FBF6EC 600px)' : undefined, boxShadow: '0 0 40px rgba(0,0,0,0.06)' }}>
         {showLocationModal && !isAdminRoute && (
           <LocationModal
             deliverySettings={deliverySettings}
@@ -4390,9 +4584,9 @@ export default function App() {
 
         {!isAdminRoute && (
           showBackHeader ? (
-            <Header title={headerTitleMap[route.page] || ''} onBack={() => nav(route.page === 'product' ? 'home' : 'home')} />
+            <Header title={headerTitleMap[route.page] || ''} onBack={() => nav(route.page === 'product' ? 'home' : 'home')} theme={theme} bgStyle={bgStyle} />
           ) : (
-            <Header query={query} setQuery={setQuery} onSearch={runSearch} area={deliveryArea} onChangeLocation={() => setShowLocationModal(true)} shopName={deliverySettings.shopName} products={products} nav={nav} categories={allRealCategories} deliverySettings={deliverySettings} theme={theme} setTheme={setTheme} lang={lang} setLang={setLangState} />
+            <Header query={query} setQuery={setQuery} onSearch={runSearch} area={deliveryArea} onChangeLocation={() => setShowLocationModal(true)} shopName={deliverySettings.shopName} products={products} nav={nav} categories={allRealCategories} deliverySettings={deliverySettings} theme={theme} setTheme={setTheme} lang={lang} setLang={setLangState} bgStyle={bgStyle} setBgStyle={setBgStyle} />
           )
         )}
 
@@ -4430,6 +4624,7 @@ export default function App() {
           {route.page === 'game' && <GamePage />}
           {route.page === 'faq' && <FAQPage deliverySettings={deliverySettings} />}
           {route.page === 'contact' && <ContactPage />}
+          {route.page === 'returns' && <ReturnsPage deliverySettings={deliverySettings} />}
           {route.page === 'terms' && <TermsPage deliverySettings={deliverySettings} />}
           {route.page === 'privacy' && <PrivacyPage deliverySettings={deliverySettings} />}
           {route.page === 'wishlist' && <WishlistPage products={products} wishlist={wishlist} nav={nav} onAdd={addToCart} cart={cart} onToggleWishlist={toggleWishlist} />}
