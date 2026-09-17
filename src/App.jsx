@@ -5,7 +5,7 @@ import {
   Wind, Heart, Palette, Baby, Sun, Tag, Lock, Truck, CreditCard, Banknote,
   MessageCircle, Trash2, PlusCircle, BarChart3, Users,
   ClipboardList, AlertCircle, CheckCircle2, ArrowLeft,
-  LogOut, Flower, ShoppingBasket, Smartphone, ImagePlus, KeyRound, Moon, FileText, ShieldCheck, Share2, MoreVertical, Pencil
+  LogOut, Flower, ShoppingBasket, Smartphone, ImagePlus, KeyRound, Moon, FileText, ShieldCheck, Share2, MoreVertical, Pencil, Eye
 } from 'lucide-react';
 
 if (typeof window !== 'undefined' && !window.storage) {
@@ -97,6 +97,8 @@ function isBannerActive(ds) {
   return true;
 }
 let currentTheme = 'light';
+let quickViewSetter = null;
+function openQuickView(product) { if (quickViewSetter) quickViewSetter(product); }
 function applyTheme(mode, deliverySettings) {
   currentTheme = mode === 'dark' ? 'dark' : 'light';
   Object.assign(COLORS, mode === 'dark' ? DARK_THEME : LIGHT_THEME);
@@ -334,6 +336,8 @@ function toDbProductPatch(patch) {
   if ('desc' in patch) out.description = patch.desc;
   if ('imageUrl' in patch) out.image_url = patch.imageUrl;
   if ('quantity' in patch) out.quantity = patch.quantity;
+  if ('bulkMinQty' in patch) out.bulk_min_qty = patch.bulkMinQty || null;
+  if ('bulkDiscountPercent' in patch) out.bulk_discount_percent = patch.bulkDiscountPercent || null;
   return out;
 }
 function mapProductFromDb(r) {
@@ -342,6 +346,7 @@ function mapProductFromDb(r) {
     id: r.id, category: r.category, categories, name: r.name, price: Number(r.price), mrp: Number(r.mrp), stock: r.stock,
     emoji: r.emoji || '\ud83d\udecd\ufe0f', g1: r.g1 || '#F7D9C4', g2: r.g2 || '#F0B499', rating: Number(r.rating) || 4,
     bestSeller: !!r.best_seller, isNew: !!r.is_new, deal: !!r.deal, featured: !!r.featured, desc: r.description || '', imageUrl: r.image_url || '', quantity: r.quantity || '',
+    viewCount: Number(r.view_count) || 0, bulkMinQty: r.bulk_min_qty || null, bulkDiscountPercent: r.bulk_discount_percent || null,
   };
 }
 // A product is "in" a category if it's the primary category, or listed among
@@ -449,6 +454,7 @@ function mapDeliveryFromDb(row, pinRows) {
     openTime: row.open_time || '09:00',
     closeTime: row.close_time || '21:00',
     manuallyClosed: !!row.manually_closed,
+    announcementEnabled: !!row.announcement_enabled, announcementText: row.announcement_text || '',
     productsSeeded: !!row.products_seeded,
     adminPassword: row.admin_password || 'admin123',
     bannerEnabled: !!row.banner_enabled,
@@ -468,6 +474,13 @@ function mapDeliveryFromDb(row, pinRows) {
 const money = (n) => '\u20b9' + Number(n || 0).toLocaleString('en-IN');
 const paymentLabel = (p) => (p === 'cod' ? 'Cash on Delivery' : p === 'upi' ? 'UPI' : 'Online (Card/Netbanking)');
 const pctOff = (price, mrp) => (mrp > price ? Math.round((1 - price / mrp) * 100) : 0);
+function bulkLineTotal(item) {
+  const base = item.price * item.qty;
+  if (item.bulkMinQty && item.bulkDiscountPercent && item.qty >= item.bulkMinQty) {
+    return Math.round(base * (1 - item.bulkDiscountPercent / 100));
+  }
+  return base;
+}
 const clamp2 = { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' };
 const clamp1 = { display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden' };
 
@@ -524,6 +537,8 @@ const SEED_DELIVERY = {
   openTime: '09:00',
   closeTime: '21:00',
   manuallyClosed: false,
+  announcementEnabled: false,
+  announcementText: '',
   productsSeeded: false,
   bannerEnabled: false,
   bannerTitle: '',
@@ -661,6 +676,13 @@ function ProductCard({ product, onOpen, onAdd, qty, isWishlisted, onToggleWishli
             <Heart size={14} fill={isWishlisted ? COLORS.danger : 'none'} color={isWishlisted ? COLORS.danger : COLORS.inkSoft} />
           </button>
         )}
+        <button
+          onClick={(e) => { e.stopPropagation(); openQuickView(product); }}
+          className="absolute flex items-center justify-center rounded-full"
+          style={{ top: 8, right: onToggleWishlist ? 32 : 8, width: 26, height: 26, background: 'rgba(255,255,255,0.85)' }}
+        >
+          <Eye size={13} color={COLORS.inkSoft} />
+        </button>
         {product.stock === 0 && (
           <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(43,32,19,0.55)' }}>
             <span className="text-xs font-semibold text-white">Out of stock</span>
@@ -826,6 +848,22 @@ function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack
                     </div>
                   </div>
                 )}
+                <button
+                  onClick={async () => {
+                    setShowMenu(false);
+                    const url = `${window.location.origin}${window.location.pathname}`;
+                    const text = `Check out ${shopName || 'this store'} \u2014 order online and get it delivered: ${url}`;
+                    if (navigator.share) {
+                      try { await navigator.share({ title: shopName, text, url }); } catch (e) { /* cancelled */ }
+                    } else {
+                      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+                    }
+                  }}
+                  className="text-left px-4 py-2.5"
+                  style={{ borderBottom: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, fontWeight: 600, color: COLORS.ink }}
+                >
+                  \ud83d\udce4 Refer a Friend
+                </button>
                 {[
                   { label: t('myDetails'), page: 'profile' },
                   { label: t('myOrders'), page: 'my-orders' },
@@ -942,6 +980,37 @@ function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack
   );
 }
 
+function FloatingActions({ deliverySettings }) {
+  const [showTop, setShowTop] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setShowTop(window.scrollY > 500);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+  const waMsg = encodeURIComponent(`Hi ${deliverySettings.shopName || 'there'}, I have a question.`);
+  return (
+    <div className="fixed flex flex-col items-center gap-2.5" style={{ right: 16, bottom: 100, zIndex: 55 }}>
+      {showTop && (
+        <button
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          className="rounded-full flex items-center justify-center"
+          style={{ width: 42, height: 42, background: COLORS.card, border: `1px solid ${COLORS.border}`, boxShadow: '0 4px 14px rgba(0,0,0,0.14)' }}
+        >
+          <ChevronDown size={18} color={COLORS.ink} style={{ transform: 'rotate(180deg)' }} />
+        </button>
+      )}
+      <a
+        href={`https://wa.me/${deliverySettings.whatsappNumber}?text=${waMsg}`}
+        target="_blank" rel="noreferrer"
+        className="rounded-full flex items-center justify-center"
+        style={{ width: 50, height: 50, background: '#25D366', boxShadow: '0 6px 18px rgba(37,211,102,0.4)' }}
+      >
+        <MessageCircle size={24} color="#fff" fill="#fff" />
+      </a>
+    </div>
+  );
+}
+
 function BottomNav({ page, nav, cartCount }) {
   const items = [
     { id: 'home', label: t('home'), Icon: Home },
@@ -1047,25 +1116,15 @@ function HomePage({ products, nav, onAdd, cart, area, categories, deliverySettin
   const newArrivals = products.filter((p) => p.isNew);
   const deals = products.filter((p) => p.deal);
   const recommended = [...products].sort((a, b) => b.rating - a.rating).slice(0, 8);
+  const [recentIds, setRecentIds] = useState([]);
+  useEffect(() => {
+    window.storage.get('mm-recently-viewed').then((r) => {
+      if (r && r.value) setRecentIds(JSON.parse(r.value));
+    }).catch(() => {});
+  }, []);
+  const recentlyViewed = recentIds.map((id) => products.find((p) => p.id === id)).filter(Boolean);
   return (
-    <div className="pb-6" style={{ position: 'relative' }}>
-      <div
-        className="absolute flex items-center justify-center"
-        style={{
-          top: 0, left: 0, right: 0, height: 400, zIndex: 0, pointerEvents: 'none', overflow: 'hidden',
-        }}
-      >
-        <span
-          style={{
-            fontFamily: displayFont, fontWeight: 500, fontSize: 'min(9vw, 38px)', letterSpacing: 9,
-            color: currentTheme === 'dark' ? 'rgba(255,255,255,0.14)' : 'rgba(34,31,26,0.11)',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          KULJEET STORE
-        </span>
-      </div>
-      <div style={{ position: 'relative', zIndex: 1 }}>
+    <div className="pb-6">
       {isBannerActive(deliverySettings) && (
         <div className="mx-4 mt-1 mb-5 rounded-2xl p-5 relative overflow-hidden" style={{ background: `linear-gradient(120deg, ${deliverySettings.bannerColor1}, ${deliverySettings.bannerColor2})` }}>
           <FestiveSparkles />
@@ -1102,6 +1161,23 @@ function HomePage({ products, nav, onAdd, cart, area, categories, deliverySettin
           <Rail products={products.filter((p) => p.featured)} onOpen={(p) => nav('product', { id: p.id })} onAdd={onAdd} cart={cart} wishlist={wishlist} onToggleWishlist={onToggleWishlist} size="large" />
         </>
       )}
+      {!!recentlyViewed.length && (
+        <>
+          <div className="mt-6" />
+          <SectionHeader title="Recently Viewed" />
+          <Rail products={recentlyViewed} onOpen={(p) => nav('product', { id: p.id })} onAdd={onAdd} cart={cart} wishlist={wishlist} onToggleWishlist={onToggleWishlist} />
+        </>
+      )}
+      {(() => {
+        const trending = [...products].filter((p) => p.viewCount > 0).sort((a, b) => b.viewCount - a.viewCount).slice(0, 10);
+        return !!trending.length && (
+          <>
+            <div className="mt-6" />
+            <SectionHeader title="Trending Now" subtitle="What everyone's been looking at" />
+            <Rail products={trending} onOpen={(p) => nav('product', { id: p.id })} onAdd={onAdd} cart={cart} wishlist={wishlist} onToggleWishlist={onToggleWishlist} />
+          </>
+        );
+      })()}
       <div className="mt-6" />
       <SectionHeader title={t('bestSellers')} subtitle={t('lovedByNeighbours')} onSeeAll={() => nav('list', { title: t('bestSellers'), filter: 'bestSeller' })} />
       <Rail products={bestSellers} onOpen={(p) => nav('product', { id: p.id })} onAdd={onAdd} cart={cart} wishlist={wishlist} onToggleWishlist={onToggleWishlist} />
@@ -1125,7 +1201,6 @@ function HomePage({ products, nav, onAdd, cart, area, categories, deliverySettin
       <button onClick={() => nav('about')} className="w-full mt-7 py-3.5 flex items-center justify-center gap-1.5" style={{ borderTop: `1px solid ${COLORS.border}`, color: COLORS.inkSoft, fontFamily: bodyFont, fontSize: 12, fontWeight: 600 }}>
         {t('aboutUsContact')} <ChevronRight size={14} />
       </button>
-      </div>
     </div>
   );
 }
@@ -1146,16 +1221,33 @@ function CategoriesPage({ nav, categories }) {
 }
 
 function ProductListPage({ products, title, nav, onAdd, cart, wishlist, onToggleWishlist }) {
+  const [sort, setSort] = useState('default');
+  const sorted = (() => {
+    if (sort === 'price-asc') return [...products].sort((a, b) => a.price - b.price);
+    if (sort === 'price-desc') return [...products].sort((a, b) => b.price - a.price);
+    if (sort === 'rating') return [...products].sort((a, b) => b.rating - a.rating);
+    return products;
+  })();
   return (
     <div className="p-4">
-      {!products.length ? (
+      {!!products.length && (
+        <div className="flex justify-end mb-3">
+          <select value={sort} onChange={(e) => setSort(e.target.value)} className="px-3 py-2 rounded-full" style={{ background: 'transparent', border: `1px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: bodyFont, fontSize: 11.5, fontWeight: 700 }}>
+            <option value="default">Sort: Featured</option>
+            <option value="price-asc">Price: Low to High</option>
+            <option value="price-desc">Price: High to Low</option>
+            <option value="rating">Rating</option>
+          </select>
+        </div>
+      )}
+      {!sorted.length ? (
         <div className="flex flex-col items-center py-16 gap-2">
           <Package size={36} color={COLORS.inkSoft} />
           <p style={{ fontFamily: bodyFont, color: COLORS.inkSoft, fontSize: 13 }}>{t('noProductsFound')}</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3">
-          {products.map((p) => (
+          {sorted.map((p) => (
             <ProductCard key={p.id} product={p} onOpen={(pr) => nav('product', { id: pr.id })} onAdd={onAdd} qty={cart[p.id] || 0} isWishlisted={!!(wishlist && wishlist[p.id])} onToggleWishlist={onToggleWishlist} />
           ))}
         </div>
@@ -1168,7 +1260,14 @@ function WishlistPage({ products, wishlist, nav, onAdd, cart, onToggleWishlist }
   const saved = products.filter((p) => wishlist && wishlist[p.id]);
   return (
     <div className="p-4">
-      <h2 style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 18, color: COLORS.ink, marginBottom: 14 }}>{t('myWishlist')}</h2>
+      <div className="flex items-center justify-between mb-3.5">
+        <h2 style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 18, color: COLORS.ink }}>{t('myWishlist')}</h2>
+        {!!saved.length && (
+          <button onClick={() => saved.forEach((p) => p.stock > 0 && onAdd(p))} className="px-3.5 py-2 rounded-full" style={{ border: `1.5px solid ${COLORS.primary}`, color: COLORS.primary, fontFamily: bodyFont, fontWeight: 700, fontSize: 11.5 }}>
+            Add All to Cart
+          </button>
+        )}
+      </div>
       {!saved.length ? (
         <div className="flex flex-col items-center py-16 gap-2">
           <Heart size={36} color={COLORS.inkSoft} />
@@ -1186,7 +1285,7 @@ function WishlistPage({ products, wishlist, nav, onAdd, cart, onToggleWishlist }
   );
 }
 
-function ProductPage({ product, nav, onAdd, onBuyNow, qty, reviews = [], onAddReview, isWishlisted, onToggleWishlist }) {
+function ProductPage({ product, nav, onAdd, onBuyNow, qty, reviews = [], onAddReview, isWishlisted, onToggleWishlist, deliverySettings }) {
   const [n, setN] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [rName, setRName] = useState('');
@@ -1195,6 +1294,19 @@ function ProductPage({ product, nav, onAdd, onBuyNow, qty, reviews = [], onAddRe
   const [rError, setRError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [showFullImage, setShowFullImage] = useState(false);
+
+  useEffect(() => {
+    window.storage.get('mm-recently-viewed').then((r) => {
+      const ids = r && r.value ? JSON.parse(r.value) : [];
+      const next = [product.id, ...ids.filter((id) => id !== product.id)].slice(0, 12);
+      window.storage.set('mm-recently-viewed', JSON.stringify(next)).catch(() => {});
+    }).catch(() => {
+      window.storage.set('mm-recently-viewed', JSON.stringify([product.id])).catch(() => {});
+    });
+    if (BACKEND_ENABLED) {
+      sbRpc('increment_view_count', { p_id: product.id }).catch((e) => console.error('View count failed to sync:', e));
+    }
+  }, [product.id]);
   if (!product) return null;
   const off = pctOff(product.price, product.mrp);
 
@@ -1283,6 +1395,13 @@ function ProductPage({ product, nav, onAdd, onBuyNow, qty, reviews = [], onAddRe
             {product.stock === 0 ? t('outOfStockLine') : product.stock <= LOW_STOCK_THRESHOLD ? t('onlyLeftOrderSoon', { n: product.stock }) : t('inStockCount', { n: product.stock })}
           </span>
         </div>
+        {product.bulkMinQty && product.bulkDiscountPercent && (
+          <div className="mt-2 px-3 py-2 rounded-lg inline-block" style={{ background: COLORS.successTint }}>
+            <span style={{ fontFamily: bodyFont, fontSize: 11.5, fontWeight: 700, color: COLORS.secondary }}>
+              Buy {product.bulkMinQty} or more, get {product.bulkDiscountPercent}% off
+            </span>
+          </div>
+        )}
         <div className="mt-4"><PriceTag price={product.price} mrp={product.mrp} size="lg" /></div>
 
         <div className="mt-5">
@@ -1355,22 +1474,33 @@ function ProductPage({ product, nav, onAdd, onBuyNow, qty, reviews = [], onAddRe
 
       <div className="fixed left-0 right-0 flex justify-center z-40" style={{ bottom: 58 }}>
         <div className="w-full flex gap-3 p-3" style={{ background: COLORS.card, borderTop: `1px solid ${COLORS.border}`, maxWidth: 448, boxShadow: '0 -6px 18px rgba(43,32,19,0.10)' }}>
-          <button
-            onClick={() => onAdd(product, n)}
-            disabled={product.stock === 0}
-            className="flex-1 py-3 rounded-xl flex items-center justify-center gap-2"
-            style={{ background: 'transparent', border: `2px solid ${COLORS.primary}`, color: COLORS.ink, fontFamily: bodyFont, fontWeight: 700, fontSize: 13.5, opacity: product.stock === 0 ? 0.5 : 1 }}
-          >
-            <ShoppingCart size={16} /> {t('addToCart')}
-          </button>
-          <button
-            onClick={() => onBuyNow(product, n)}
-            disabled={product.stock === 0}
-            className="flex-1 py-3 rounded-xl"
-            style={{ background: product.stock === 0 ? COLORS.border : COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 13.5, boxShadow: product.stock === 0 ? 'none' : '0 4px 10px rgba(217,115,13,0.35)' }}
-          >
-            {t('buyNow')}
-          </button>
+          {product.stock === 0 ? (
+            <a
+              href={`https://wa.me/${deliverySettings && deliverySettings.whatsappNumber}?text=${encodeURIComponent(`Hi, please notify me when "${product.name}" is back in stock.`)}`}
+              target="_blank" rel="noreferrer"
+              className="flex-1 py-3 rounded-xl flex items-center justify-center gap-2"
+              style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 13.5 }}
+            >
+              <MessageCircle size={16} /> Notify Me When Available
+            </a>
+          ) : (
+            <>
+              <button
+                onClick={() => onAdd(product, n)}
+                className="flex-1 py-3 rounded-xl flex items-center justify-center gap-2"
+                style={{ background: 'transparent', border: `2px solid ${COLORS.primary}`, color: COLORS.ink, fontFamily: bodyFont, fontWeight: 700, fontSize: 13.5 }}
+              >
+                <ShoppingCart size={16} /> {t('addToCart')}
+              </button>
+              <button
+                onClick={() => onBuyNow(product, n)}
+                className="flex-1 py-3 rounded-xl"
+                style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 13.5, boxShadow: '0 4px 10px rgba(217,115,13,0.35)' }}
+              >
+                {t('buyNow')}
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -1416,8 +1546,13 @@ function CartPage({ cartItems, updateQty, removeItem, subtotal, nav, products = 
                 )}
                 <button onClick={() => removeItem(item.id)}><Trash2 size={14} color={COLORS.danger} /></button>
               </div>
+              {item.bulkMinQty && item.bulkDiscountPercent && (
+                <p style={{ fontFamily: bodyFont, fontSize: 10, color: item.qty >= item.bulkMinQty ? COLORS.secondary : COLORS.inkSoft, marginTop: 4, fontWeight: item.qty >= item.bulkMinQty ? 700 : 500 }}>
+                  {item.qty >= item.bulkMinQty ? `${item.bulkDiscountPercent}% bulk discount applied!` : `Buy ${item.bulkMinQty}+ and get ${item.bulkDiscountPercent}% off`}
+                </p>
+              )}
             </div>
-            <span style={{ fontFamily: monoFont, fontSize: 12.5, fontWeight: 700, color: COLORS.ink }}>{money(item.price * item.qty)}</span>
+            <span style={{ fontFamily: monoFont, fontSize: 12.5, fontWeight: 700, color: COLORS.ink }}>{money(bulkLineTotal(item))}</span>
           </div>
         ))}
       </div>
@@ -1457,9 +1592,41 @@ function CheckoutPage({ cartItems, subtotal, deliverySettings, nav, placeOrder }
     }).catch(() => {});
   }, []);
 
+  const [savedAddresses, setSavedAddresses] = useState([]);
+  useEffect(() => {
+    window.storage.get('mm-addresses').then((r) => {
+      if (r && r.value) setSavedAddresses(JSON.parse(r.value));
+    }).catch(() => {});
+  }, []);
+
   const belowMin = subtotal < deliverySettings.minOrderValue;
   const deliveryCharge = subtotal >= deliverySettings.freeDeliveryThreshold ? 0 : deliverySettings.deliveryCharge;
-  const total = subtotal + deliveryCharge;
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [couponMsg, setCouponMsg] = useState('');
+  const [couponChecking, setCouponChecking] = useState(false);
+  const discount = appliedCoupon ? (appliedCoupon.discountType === 'percent' ? Math.round(subtotal * appliedCoupon.discountValue / 100) : Math.min(appliedCoupon.discountValue, subtotal)) : 0;
+  const total = Math.max(0, subtotal + deliveryCharge - discount);
+
+  const applyCoupon = async () => {
+    if (!couponCode.trim() || !BACKEND_ENABLED) return;
+    setCouponChecking(true);
+    setCouponMsg('');
+    try {
+      const rows = await sbRpc('validate_coupon', { p_code: couponCode.trim() });
+      if (rows && rows[0]) {
+        setAppliedCoupon({ code: rows[0].code, discountType: rows[0].discount_type, discountValue: Number(rows[0].discount_value) });
+        setCouponMsg('');
+      } else {
+        setAppliedCoupon(null);
+        setCouponMsg('That code isn\u2019t valid.');
+      }
+    } catch (e) {
+      setCouponMsg('Could not check that code right now.');
+    } finally {
+      setCouponChecking(false);
+    }
+  };
   const shopClosed = !isShopOpen(deliverySettings);
 
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
@@ -1477,7 +1644,7 @@ function CheckoutPage({ cartItems, subtotal, deliverySettings, nav, placeOrder }
       setPaying(true);
       const result = await payWithRazorpay({ amountRupees: total, shopName: deliverySettings.shopName, customerName: form.name, customerMobile: form.mobile });
       if (!result.success) { setPaying(false); return setError(result.error || 'Payment could not be completed.'); }
-      await placeOrder({ ...form, payment, deliveryCharge, total, subtotal, area: zone.area, paymentId: result.paymentId });
+      await placeOrder({ ...form, payment, deliveryCharge, total, subtotal, area: zone.area, paymentId: result.paymentId, couponCode: appliedCoupon ? appliedCoupon.code : null, discount });
       setPaying(false);
       return;
     }
@@ -1489,14 +1656,14 @@ function CheckoutPage({ cartItems, subtotal, deliverySettings, nav, placeOrder }
       return;
     }
     setPaying(true);
-    await placeOrder({ ...form, payment, deliveryCharge, total, subtotal, area: zone.area });
+    await placeOrder({ ...form, payment, deliveryCharge, total, subtotal, area: zone.area, couponCode: appliedCoupon ? appliedCoupon.code : null, discount });
     setPaying(false);
   };
 
   const [upiRef, setUpiRef] = useState('');
   const confirmUpiPaid = async () => {
     setPaying(true);
-    await placeOrder({ ...form, payment, deliveryCharge, total, subtotal, area: zone.area, paymentId: upiRef.trim() || undefined });
+    await placeOrder({ ...form, payment, deliveryCharge, total, subtotal, area: zone.area, paymentId: upiRef.trim() || undefined, couponCode: appliedCoupon ? appliedCoupon.code : null, discount });
     setPaying(false);
   };
 
@@ -1582,6 +1749,20 @@ function CheckoutPage({ cartItems, subtotal, deliverySettings, nav, placeOrder }
         </div>
       )}
       <h2 style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 13, color: COLORS.ink, marginBottom: 8 }}>Delivery Details</h2>
+      {!!savedAddresses.length && (
+        <div className="flex gap-2 mb-3 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+          {savedAddresses.map((a) => (
+            <button
+              key={a.id}
+              onClick={() => setForm({ name: a.name || '', mobile: a.mobile || '', address: a.address || '', pincode: a.pincode || '' })}
+              className="px-3.5 py-2 rounded-full flex-shrink-0"
+              style={{ border: `1px solid ${COLORS.primary}`, color: COLORS.primary, fontFamily: bodyFont, fontWeight: 700, fontSize: 11.5, whiteSpace: 'nowrap' }}
+            >
+              {a.label || 'Address'}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="flex flex-col gap-2.5">
         <input value={form.name} onChange={set('name')} placeholder={t("fullName")} className="px-4 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none' }} />
         <input value={form.mobile} onChange={(e) => setForm({ ...form, mobile: e.target.value.replace(/\D/g, '').slice(0, 10) })} placeholder={t("mobileNumber")} className="px-4 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 13, outline: 'none' }} />
@@ -1624,8 +1805,23 @@ function CheckoutPage({ cartItems, subtotal, deliverySettings, nav, placeOrder }
       </div>
 
       <div className="mt-5 rounded-2xl p-4" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+        {appliedCoupon ? (
+          <div className="flex items-center justify-between mb-3 px-3 py-2 rounded-lg" style={{ background: COLORS.successTint }}>
+            <span style={{ fontFamily: monoFont, fontWeight: 700, fontSize: 12, color: COLORS.secondary }}>{appliedCoupon.code} applied</span>
+            <button onClick={() => { setAppliedCoupon(null); setCouponCode(''); }}><X size={14} color={COLORS.secondary} /></button>
+          </div>
+        ) : (
+          <div className="flex gap-2 mb-3">
+            <input value={couponCode} onChange={(e) => setCouponCode(e.target.value.toUpperCase())} placeholder="Coupon code" className="flex-1 px-3 py-2 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 12, outline: 'none' }} />
+            <button onClick={applyCoupon} disabled={couponChecking} className="px-4 py-2 rounded-lg" style={{ border: `1px solid ${COLORS.primary}`, color: COLORS.primary, fontFamily: bodyFont, fontWeight: 700, fontSize: 12 }}>
+              {couponChecking ? '...' : 'Apply'}
+            </button>
+          </div>
+        )}
+        {couponMsg && <p style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.danger, marginBottom: 8 }}>{couponMsg}</p>}
         <div className="flex justify-between mb-1.5"><span style={{ fontFamily: bodyFont, fontSize: 12.5, color: COLORS.inkSoft }}>{t('subtotal')}</span><span style={{ fontFamily: monoFont, fontSize: 12.5, color: COLORS.ink }}>{money(subtotal)}</span></div>
         <div className="flex justify-between mb-1.5"><span style={{ fontFamily: bodyFont, fontSize: 12.5, color: COLORS.inkSoft }}>{t('deliveryCharge')}</span><span style={{ fontFamily: monoFont, fontSize: 12.5, color: deliveryCharge === 0 ? COLORS.secondary : COLORS.ink }}>{deliveryCharge === 0 ? t('free') : money(deliveryCharge)}</span></div>
+        {discount > 0 && <div className="flex justify-between mb-1.5"><span style={{ fontFamily: bodyFont, fontSize: 12.5, color: COLORS.secondary }}>Coupon discount</span><span style={{ fontFamily: monoFont, fontSize: 12.5, color: COLORS.secondary }}>-{money(discount)}</span></div>}
         {belowMin && <p style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.danger, marginBottom: 6 }}>Minimum order value is {money(deliverySettings.minOrderValue)}. Add {money(deliverySettings.minOrderValue - subtotal)} more.</p>}
         {!belowMin && deliveryCharge > 0 && <p style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft, marginBottom: 6 }}>Add {money(deliverySettings.freeDeliveryThreshold - subtotal)} more for free delivery.</p>}
         <div className="flex justify-between pt-2" style={{ borderTop: `1px dashed ${COLORS.border}` }}>
@@ -2034,7 +2230,7 @@ function GamePage() {
   );
 }
 
-function MyOrdersPage({ deliverySettings }) {
+function MyOrdersPage({ deliverySettings, onOrderAgain }) {
   const [loading, setLoading] = useState(true);
   const [ordersList, setOrdersList] = useState([]);
   const [viewOrder, setViewOrder] = useState(null);
@@ -2077,14 +2273,21 @@ function MyOrdersPage({ deliverySettings }) {
       )}
       <div className="flex flex-col gap-2.5">
         {ordersList.map((o) => (
-          <button key={o.id} onClick={() => setViewOrder(o)} className="w-full flex items-center gap-3 rounded-xl p-3.5 text-left" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
-            <div className="flex-1 min-w-0">
-              <p style={{ fontFamily: monoFont, fontWeight: 700, fontSize: 12, color: COLORS.ink }}>{o.id}</p>
-              <p style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft }}>{new Date(o.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} &bull; {o.items.length} item{o.items.length === 1 ? '' : 's'}</p>
-            </div>
-            <p style={{ fontFamily: monoFont, fontWeight: 700, fontSize: 13, color: COLORS.ink }}>{money(o.total)}</p>
-            <ChevronRight size={16} color={COLORS.inkSoft} />
-          </button>
+          <div key={o.id} className="w-full rounded-xl p-3.5" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+            <button onClick={() => setViewOrder(o)} className="w-full flex items-center gap-3 text-left">
+              <div className="flex-1 min-w-0">
+                <p style={{ fontFamily: monoFont, fontWeight: 700, fontSize: 12, color: COLORS.ink }}>{o.id}</p>
+                <p style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft }}>{new Date(o.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} &bull; {o.items.length} item{o.items.length === 1 ? '' : 's'}</p>
+              </div>
+              <p style={{ fontFamily: monoFont, fontWeight: 700, fontSize: 13, color: COLORS.ink }}>{money(o.total)}</p>
+              <ChevronRight size={16} color={COLORS.inkSoft} />
+            </button>
+            {onOrderAgain && (
+              <button onClick={() => onOrderAgain(o.items)} className="w-full mt-2.5 py-2 rounded-lg" style={{ border: `1px solid ${COLORS.primary}`, color: COLORS.primary, fontFamily: bodyFont, fontWeight: 700, fontSize: 11.5 }}>
+                Order Again
+              </button>
+            )}
+          </div>
         ))}
       </div>
       {viewOrder && <InvoiceOverlay order={viewOrder} deliverySettings={deliverySettings} onClose={() => setViewOrder(null)} />}
@@ -2093,62 +2296,100 @@ function MyOrdersPage({ deliverySettings }) {
 }
 
 function ProfilePage() {
-  const [form, setForm] = useState({ name: '', mobile: '', address: '', pincode: '' });
+  const [addresses, setAddresses] = useState([]);
   const [loaded, setLoaded] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [form, setForm] = useState({ label: '', name: '', mobile: '', address: '', pincode: '' });
+  const [showForm, setShowForm] = useState(false);
 
   useEffect(() => {
-    window.storage.get('mm-profile').then((r) => {
-      if (r && r.value) setForm({ ...form, ...JSON.parse(r.value) });
-    }).catch(() => {}).finally(() => setLoaded(true));
+    (async () => {
+      try {
+        const r = await window.storage.get('mm-addresses');
+        let list = r && r.value ? JSON.parse(r.value) : [];
+        if (!list.length) {
+          // Migrate the old single-profile save, if any, into the new address book.
+          const old = await window.storage.get('mm-profile').catch(() => null);
+          if (old && old.value) {
+            const p = JSON.parse(old.value);
+            if (p.name || p.address) {
+              list = [{ id: 'addr' + Date.now(), label: 'Home', ...p }];
+              window.storage.set('mm-addresses', JSON.stringify(list)).catch(() => {});
+            }
+          }
+        }
+        setAddresses(list);
+      } catch (e) { /* ignore */ }
+      setLoaded(true);
+    })();
   }, []);
 
-  const set = (k) => (e) => { setForm({ ...form, [k]: e.target.value }); setSaved(false); };
-
-  const save = () => {
-    window.storage.set('mm-profile', JSON.stringify(form)).then(() => {
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-    }).catch(() => {});
+  const persist = (list) => {
+    setAddresses(list);
+    window.storage.set('mm-addresses', JSON.stringify(list)).catch(() => {});
+    if (list[0]) window.storage.set('mm-profile', JSON.stringify(list[0])).catch(() => {});
   };
 
-  const clearProfile = () => {
-    window.storage.delete('mm-profile').then(() => {
-      setForm({ name: '', mobile: '', address: '', pincode: '' });
-    }).catch(() => {});
+  const startAdd = () => {
+    setEditingId(null);
+    setForm({ label: '', name: '', mobile: '', address: '', pincode: '' });
+    setShowForm(true);
   };
+  const startEditAddr = (a) => {
+    setEditingId(a.id);
+    setForm({ label: a.label || '', name: a.name || '', mobile: a.mobile || '', address: a.address || '', pincode: a.pincode || '' });
+    setShowForm(true);
+  };
+  const saveAddr = () => {
+    if (!form.name.trim() || !form.address.trim()) return;
+    if (editingId) {
+      persist(addresses.map((a) => (a.id === editingId ? { ...a, ...form } : a)));
+    } else {
+      persist([...addresses, { id: 'addr' + Date.now(), ...form }]);
+    }
+    setShowForm(false);
+  };
+  const removeAddr = (id) => persist(addresses.filter((a) => a.id !== id));
 
   if (!loaded) return null;
 
   return (
     <div className="p-4 pb-10 flex flex-col gap-4">
       <p style={{ fontFamily: bodyFont, fontSize: 12, color: COLORS.inkSoft, lineHeight: 1.6 }}>
-        Save your details here once, and we&rsquo;ll fill them in automatically next time you check out. This is saved only on this device &mdash; we don&apos;t store it anywhere else, and nobody else can see it.
+        Save one or more delivery addresses here, and pick from them at checkout. This is saved only on this device &mdash; we don&apos;t store it anywhere else, and nobody else can see it.
       </p>
 
-      <label className="flex flex-col gap-1.5">
-        <span style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.inkSoft, fontWeight: 700 }}>{t('fullName')}</span>
-        <input value={form.name} onChange={set('name')} placeholder="Your name" className="px-3.5 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none' }} />
-      </label>
-      <label className="flex flex-col gap-1.5">
-        <span style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.inkSoft, fontWeight: 700 }}>{t('mobileNumber')}</span>
-        <input value={form.mobile} onChange={set('mobile')} placeholder="10-digit mobile number" className="px-3.5 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 13, outline: 'none' }} />
-      </label>
-      <label className="flex flex-col gap-1.5">
-        <span style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.inkSoft, fontWeight: 700 }}>{t('deliveryAddress')}</span>
-        <textarea value={form.address} onChange={set('address')} placeholder="House no., street, landmark" rows={3} className="px-3.5 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none', resize: 'none' }} />
-      </label>
-      <label className="flex flex-col gap-1.5">
-        <span style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.inkSoft, fontWeight: 700 }}>{t('pincode')}</span>
-        <input value={form.pincode} onChange={set('pincode')} placeholder="6-digit pincode" maxLength={6} className="px-3.5 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 13, outline: 'none' }} />
-      </label>
+      {addresses.map((a) => (
+        <div key={a.id} className="rounded-xl p-3.5" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+          <div className="flex items-center justify-between">
+            <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>{a.label || 'Address'}</p>
+            <div className="flex gap-3">
+              <button onClick={() => startEditAddr(a)}><Pencil size={14} color={COLORS.inkSoft} /></button>
+              <button onClick={() => removeAddr(a.id)}><Trash2 size={14} color={COLORS.danger} /></button>
+            </div>
+          </div>
+          <p style={{ fontFamily: bodyFont, fontSize: 12, color: COLORS.ink, marginTop: 4 }}>{a.name}{a.mobile ? ` \u00b7 ${a.mobile}` : ''}</p>
+          <p style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.inkSoft, marginTop: 2 }}>{a.address}{a.pincode ? `, ${a.pincode}` : ''}</p>
+        </div>
+      ))}
 
-      <button onClick={save} className="w-full py-3.5 rounded-xl mt-2" style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 14 }}>
-        {saved ? '\u2713' : t('saveMyDetails')}
-      </button>
-      <button onClick={clearProfile} className="w-full py-3" style={{ color: COLORS.danger, fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>
-        {t("clearMyDetails")}
-      </button>
+      {showForm ? (
+        <div className="rounded-xl p-3.5 flex flex-col gap-3" style={{ background: COLORS.card, border: `1.5px solid ${COLORS.primary}` }}>
+          <input value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="Label, e.g. Home, Work" className="px-3.5 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none' }} />
+          <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Full name" className="px-3.5 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none' }} />
+          <input value={form.mobile} onChange={(e) => setForm({ ...form, mobile: e.target.value })} placeholder="10-digit mobile number" className="px-3.5 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 13, outline: 'none' }} />
+          <textarea value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="House no., street, landmark" rows={3} className="px-3.5 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none', resize: 'none' }} />
+          <input value={form.pincode} onChange={(e) => setForm({ ...form, pincode: e.target.value.replace(/\D/g, '').slice(0, 6) })} placeholder="6-digit pincode" className="px-3.5 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 13, outline: 'none' }} />
+          <div className="flex gap-2">
+            <button onClick={saveAddr} className="flex-1 py-3 rounded-xl" style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 13 }}>Save Address</button>
+            <button onClick={() => setShowForm(false)} className="flex-1 py-3 rounded-xl" style={{ border: `1px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: bodyFont, fontWeight: 700, fontSize: 13 }}>Cancel</button>
+          </div>
+        </div>
+      ) : (
+        <button onClick={startAdd} className="w-full py-3.5 rounded-xl" style={{ background: 'transparent', border: `1.5px solid ${COLORS.primary}`, color: COLORS.primary, fontFamily: bodyFont, fontWeight: 700, fontSize: 14 }}>
+          + Add New Address
+        </button>
+      )}
     </div>
   );
 }
@@ -2403,6 +2644,67 @@ function AdminTabs({ tab, setTab }) {
   );
 }
 
+function QuickViewModal({ product, onClose, onAdd, nav, wishlist, onToggleWishlist }) {
+  if (!product) return null;
+  const off = pctOff(product.price, product.mrp);
+  const isWishlisted = !!(wishlist && wishlist[product.id]);
+  return (
+    <div className="fixed inset-0 flex items-end justify-center" style={{ background: 'rgba(43,32,19,0.5)', zIndex: 65 }} onClick={onClose}>
+      <div className="w-full rounded-t-3xl p-5" style={{ background: COLORS.card, maxWidth: 448 }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-3">
+          <span style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.inkSoft }}>Quick View</span>
+          <button onClick={onClose}><X size={20} color={COLORS.inkSoft} /></button>
+        </div>
+        <div className="flex gap-4">
+          <div className="rounded-2xl overflow-hidden flex items-center justify-center flex-shrink-0" style={{ width: 110, height: 110, background: product.imageUrl ? '#fff' : `linear-gradient(135deg, ${product.g1}, ${product.g2})`, border: `1px solid ${COLORS.border}` }}>
+            {product.imageUrl ? <img src={product.imageUrl} alt={product.name} className="w-full h-full" style={{ objectFit: 'cover' }} /> : <span style={{ fontSize: 44 }}>{product.emoji}</span>}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 14.5, color: COLORS.ink, lineHeight: 1.3 }}>{product.name}</p>
+            {product.quantity && <p style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.inkSoft, marginTop: 2 }}>{product.quantity}</p>}
+            <div className="flex items-center gap-1 mt-1.5">
+              <Star size={12} fill={COLORS.gold} color={COLORS.gold} />
+              <span style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.inkSoft }}>{product.rating}</span>
+            </div>
+            <div className="flex items-baseline gap-2 mt-1.5">
+              <span style={{ fontFamily: monoFont, fontWeight: 700, fontSize: 17, color: COLORS.ink }}>{money(product.price)}</span>
+              {off > 0 && <span style={{ fontFamily: monoFont, fontSize: 12, color: COLORS.inkSoft, textDecoration: 'line-through' }}>{money(product.mrp)}</span>}
+            </div>
+            <p style={{ fontFamily: bodyFont, fontSize: 11.5, color: product.stock === 0 ? COLORS.danger : COLORS.secondary, fontWeight: 700, marginTop: 4 }}>
+              {product.stock === 0 ? t('outOfStockLine') : t('inStockCount', { n: product.stock })}
+            </p>
+          </div>
+        </div>
+        {product.desc && (
+          <p style={{ fontFamily: bodyFont, fontSize: 12, color: COLORS.inkSoft, lineHeight: 1.55, marginTop: 14, maxHeight: 66, overflow: 'hidden' }}>{product.desc}</p>
+        )}
+        <div className="flex gap-2.5 mt-4">
+          {onToggleWishlist && (
+            <button onClick={() => onToggleWishlist(product.id)} className="flex items-center justify-center rounded-xl" style={{ width: 46, height: 46, border: `1.5px solid ${COLORS.border}`, flexShrink: 0 }}>
+              <Heart size={18} fill={isWishlisted ? COLORS.danger : 'none'} color={isWishlisted ? COLORS.danger : COLORS.inkSoft} />
+            </button>
+          )}
+          <button
+            onClick={() => { onAdd(product); onClose(); }}
+            disabled={product.stock === 0}
+            className="flex-1 py-3 rounded-xl flex items-center justify-center gap-2"
+            style={{ background: 'transparent', border: `2px solid ${COLORS.primary}`, color: COLORS.ink, fontFamily: bodyFont, fontWeight: 700, fontSize: 13, opacity: product.stock === 0 ? 0.5 : 1 }}
+          >
+            <ShoppingCart size={15} /> {t('addToCart')}
+          </button>
+          <button
+            onClick={() => { onClose(); nav('product', { id: product.id }); }}
+            className="flex-1 py-3 rounded-xl"
+            style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 13 }}
+          >
+            View Details
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function InvoiceOverlay({ order, deliverySettings, onClose }) {
   const gst = deliverySettings.gstNumber;
   // navigator.standalone is a legacy Apple-only flag that is true ONLY for an
@@ -2635,7 +2937,7 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
 
   const startEdit = (p) => {
     setEditingId(p.id);
-    setEditForm({ name: p.name, category: p.category, categories: p.categories && p.categories.length ? p.categories : [p.category], price: String(p.price), mrp: String(p.mrp), stock: String(p.stock), emoji: p.emoji, quantity: p.quantity || '', desc: p.desc || '', imageUrl: p.imageUrl || '' });
+    setEditForm({ name: p.name, category: p.category, categories: p.categories && p.categories.length ? p.categories : [p.category], price: String(p.price), mrp: String(p.mrp), stock: String(p.stock), emoji: p.emoji, quantity: p.quantity || '', desc: p.desc || '', imageUrl: p.imageUrl || '', bulkMinQty: p.bulkMinQty || '', bulkDiscountPercent: p.bulkDiscountPercent || '' });
   };
   const cancelEdit = () => { setEditingId(null); setEditForm(null); };
   const saveEdit = () => {
@@ -2643,6 +2945,7 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
     update(editingId, {
       name: editForm.name, category: editForm.categories[0], categories: editForm.categories, price: Number(editForm.price) || 0, mrp: Number(editForm.mrp) || 0,
       stock: Number(editForm.stock) || 0, emoji: editForm.emoji || '\ud83d\udecd\ufe0f', quantity: editForm.quantity, desc: editForm.desc, imageUrl: editForm.imageUrl,
+      bulkMinQty: editForm.bulkMinQty ? Number(editForm.bulkMinQty) : null, bulkDiscountPercent: editForm.bulkDiscountPercent ? Number(editForm.bulkDiscountPercent) : null,
     });
     cancelEdit();
   };
@@ -2790,6 +3093,7 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
     const draft = {
       category: form.categories[0], categories: form.categories, name: form.name, price: Number(form.price), mrp: Number(form.mrp),
       stock: Number(form.stock) || 0, emoji: form.emoji || '\ud83d\udecd\ufe0f', quantity: form.quantity || '', rating: 4.0, g1, g2, bestSeller: false, isNew: true, deal: false, featured: false,
+      bulkMinQty: form.bulkMinQty ? Number(form.bulkMinQty) : null, bulkDiscountPercent: form.bulkDiscountPercent ? Number(form.bulkDiscountPercent) : null,
       desc: form.desc || 'A trusted everyday pick from our store shelves.', imageUrl: form.imageUrl || '',
     };
     if (BACKEND_ENABLED) {
@@ -2797,6 +3101,7 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
         const rows = await sbInsert('products', [{
           category: draft.category, categories: draft.categories, name: draft.name, price: draft.price, mrp: draft.mrp, stock: draft.stock,
           emoji: draft.emoji, quantity: draft.quantity || null, g1, g2, rating: draft.rating, best_seller: false, is_new: true, deal: false, featured: false, description: draft.desc,
+          bulk_min_qty: draft.bulkMinQty, bulk_discount_percent: draft.bulkDiscountPercent,
           image_url: draft.imageUrl || null,
         }]);
         setProducts([...products, mapProductFromDb(rows[0])]);
@@ -2905,6 +3210,13 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
             <input value={form.emoji} onChange={(e) => setForm({ ...form, emoji: e.target.value })} placeholder="Icon (emoji)" className="w-24 px-3 py-2.5 rounded-lg text-center" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontSize: 15, outline: 'none' }} />
           </div>
           <input value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} placeholder="Pack size, e.g. 200ml, 500g, 1kg" className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }} />
+          <div>
+            <span style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft }}>Bulk discount (optional, e.g. "buy 3+ get 10% off")</span>
+            <div className="flex gap-2 mt-1">
+              <input value={form.bulkMinQty || ''} onChange={(e) => setForm({ ...form, bulkMinQty: e.target.value.replace(/\D/g, '') })} placeholder="Min qty" className="flex-1 px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 12, outline: 'none' }} />
+              <input value={form.bulkDiscountPercent || ''} onChange={(e) => setForm({ ...form, bulkDiscountPercent: e.target.value.replace(/\D/g, '') })} placeholder="% off" className="flex-1 px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 12, outline: 'none' }} />
+            </div>
+          </div>
           <textarea value={form.desc} onChange={(e) => setForm({ ...form, desc: e.target.value })} placeholder="Description" rows={2} className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none', resize: 'none' }} />
           <div className="flex items-center gap-3">
             <div className="rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0" style={{ width: 56, height: 56, background: COLORS.cream, border: `1px solid ${COLORS.border}` }}>
@@ -2958,6 +3270,13 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
                   <input value={editForm.emoji} onChange={(e) => setEditForm({ ...editForm, emoji: e.target.value })} placeholder="Icon (emoji)" className="w-24 px-3 py-2.5 rounded-lg text-center" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontSize: 15, outline: 'none' }} />
                 </div>
                 <input value={editForm.quantity} onChange={(e) => setEditForm({ ...editForm, quantity: e.target.value })} placeholder="Pack size, e.g. 200ml, 500g, 1kg" className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }} />
+                <div>
+                  <span style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft }}>Bulk discount (optional)</span>
+                  <div className="flex gap-2 mt-1">
+                    <input value={editForm.bulkMinQty || ''} onChange={(e) => setEditForm({ ...editForm, bulkMinQty: e.target.value.replace(/\D/g, '') })} placeholder="Min qty" className="flex-1 px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 12, outline: 'none' }} />
+                    <input value={editForm.bulkDiscountPercent || ''} onChange={(e) => setEditForm({ ...editForm, bulkDiscountPercent: e.target.value.replace(/\D/g, '') })} placeholder="% off" className="flex-1 px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 12, outline: 'none' }} />
+                  </div>
+                </div>
                 <textarea value={editForm.desc} onChange={(e) => setEditForm({ ...editForm, desc: e.target.value })} placeholder="Description" rows={2} className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none', resize: 'none' }} />
                 <div className="flex items-center gap-3">
                   <div className="rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0" style={{ width: 56, height: 56, background: COLORS.cream, border: `1px solid ${COLORS.border}` }}>
@@ -3032,6 +3351,7 @@ function AdminDelivery({ settings, setSettings, categories }) {
         radius_km: local.radiusKm, min_order_value: local.minOrderValue, delivery_charge: local.deliveryCharge,
         free_delivery_threshold: local.freeDeliveryThreshold, whatsapp_number: local.whatsappNumber, upi_id: local.upiId,
         open_time: local.openTime, close_time: local.closeTime, manually_closed: local.manuallyClosed,
+        announcement_enabled: local.announcementEnabled, announcement_text: local.announcementText || null,
         banner_enabled: local.bannerEnabled, banner_title: local.bannerTitle, banner_subtitle: local.bannerSubtitle,
         banner_cta: local.bannerCta, banner_category: local.bannerCategory, banner_emoji: local.bannerEmoji,
         banner_color1: local.bannerColor1, banner_color2: local.bannerColor2,
@@ -3150,6 +3470,17 @@ function AdminDelivery({ settings, setSettings, categories }) {
 
       <div className="rounded-2xl p-4 flex flex-col gap-3" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
         <div className="flex items-center justify-between">
+          <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>Announcement Ticker</p>
+          <button onClick={() => setLocal({ ...local, announcementEnabled: !local.announcementEnabled })} className="rounded-full" style={{ width: 42, height: 24, background: local.announcementEnabled ? COLORS.secondary : COLORS.border, position: 'relative', transition: 'background 0.15s' }}>
+            <div style={{ width: 18, height: 18, borderRadius: 999, background: '#fff', position: 'absolute', top: 3, left: local.announcementEnabled ? 21 : 3, transition: 'left 0.15s' }} />
+          </button>
+        </div>
+        <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft, lineHeight: 1.5 }}>A scrolling text banner shown at the top of every page, e.g. for a sale or a delivery update.</p>
+        <input value={local.announcementText} onChange={(e) => setLocal({ ...local, announcementText: e.target.value })} placeholder="e.g. Free delivery on orders above \u20b9299 this week!" className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }} />
+      </div>
+
+      <div className="rounded-2xl p-4 flex flex-col gap-3" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+        <div className="flex items-center justify-between">
           <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>Festive Banner</p>
           <button onClick={() => setLocal({ ...local, bannerEnabled: !local.bannerEnabled })} className="rounded-full" style={{ width: 42, height: 24, background: local.bannerEnabled ? COLORS.secondary : COLORS.border, position: 'relative', transition: 'background 0.15s' }}>
             <div className="rounded-full" style={{ width: 18, height: 18, background: COLORS.card, position: 'absolute', top: 3, left: local.bannerEnabled ? 21 : 3, transition: 'left 0.15s' }} />
@@ -3238,7 +3569,85 @@ function AdminDelivery({ settings, setSettings, categories }) {
         {field('Free delivery above (\u20b9)', local.freeDeliveryThreshold, (e) => setLocal({ ...local, freeDeliveryThreshold: Number(e.target.value.replace(/\D/g, '')) || 0 }), true)}
       </div>
 
+      <AdminCoupons />
+
       <button onClick={save} className="w-full py-3.5 rounded-xl" style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 14 }}>Save Delivery Settings</button>
+    </div>
+  );
+}
+
+function AdminCoupons() {
+  const [coupons, setCoupons] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState({ code: '', discountType: 'percent', discountValue: '' });
+  const [err, setErr] = useState('');
+
+  const load = () => {
+    if (!BACKEND_ENABLED) { setLoading(false); return; }
+    setLoading(true);
+    sbSelect('coupons', '?select=*&order=created_at.desc').then((rows) => {
+      setCoupons(rows.map((r) => ({ id: r.id, code: r.code, discountType: r.discount_type, discountValue: Number(r.discount_value), active: r.active })));
+    }).catch((e) => console.error('Could not load coupons (has fix-coupons.sql been run?):', e)).finally(() => setLoading(false));
+  };
+  useEffect(load, []);
+
+  const addCoupon = async () => {
+    setErr('');
+    const code = form.code.trim().toUpperCase();
+    const value = Number(form.discountValue);
+    if (!code || !value) { setErr('Enter a code and a discount value.'); return; }
+    try {
+      await sbInsert('coupons', [{ code, discount_type: form.discountType, discount_value: value, active: true }]);
+      setForm({ code: '', discountType: 'percent', discountValue: '' });
+      load();
+    } catch (e) {
+      setErr('Could not save \u2014 that code may already exist.');
+    }
+  };
+  const toggleActive = async (c) => {
+    try { await sbUpdate('coupons', `id=eq.${c.id}`, { active: !c.active }); load(); }
+    catch (e) { console.error('Could not update coupon:', e); }
+  };
+  const removeCoupon = async (id) => {
+    try { await sbDelete('coupons', `id=eq.${id}`); load(); }
+    catch (e) { console.error('Could not delete coupon:', e); }
+  };
+
+  if (!BACKEND_ENABLED) return null;
+
+  return (
+    <div className="rounded-2xl p-4 flex flex-col gap-3" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+      <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>Coupon Codes</p>
+      <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft, lineHeight: 1.5 }}>Create codes customers can enter at checkout for a discount.</p>
+
+      <div className="flex gap-2">
+        <input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} placeholder="CODE, e.g. WELCOME10" className="flex-1 px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 12, outline: 'none' }} />
+        <select value={form.discountType} onChange={(e) => setForm({ ...form, discountType: e.target.value })} className="px-2 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 11.5 }}>
+          <option value="percent">% off</option>
+          <option value="flat">\u20b9 off</option>
+        </select>
+        <input value={form.discountValue} onChange={(e) => setForm({ ...form, discountValue: e.target.value.replace(/\D/g, '') })} placeholder="10" className="w-16 px-2 py-2.5 rounded-lg text-center" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 12, outline: 'none' }} />
+      </div>
+      {err && <p style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.danger }}>{err}</p>}
+      <button onClick={addCoupon} className="py-2.5 rounded-lg" style={{ background: COLORS.ink, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>Add Coupon</button>
+
+      {loading ? (
+        <p style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.inkSoft }}>Loading\u2026</p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {!coupons.length && <p style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.inkSoft }}>No coupons yet.</p>}
+          {coupons.map((c) => (
+            <div key={c.id} className="flex items-center gap-2 p-2.5 rounded-lg" style={{ border: `1px solid ${COLORS.border}` }}>
+              <div className="flex-1">
+                <p style={{ fontFamily: monoFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>{c.code}</p>
+                <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft }}>{c.discountType === 'percent' ? `${c.discountValue}% off` : `${money(c.discountValue)} off`}</p>
+              </div>
+              <label className="flex items-center gap-1"><input type="checkbox" checked={c.active} onChange={() => toggleActive(c)} /><span style={{ fontSize: 10, fontFamily: bodyFont, color: COLORS.inkSoft }}>Active</span></label>
+              <button onClick={() => removeCoupon(c.id)}><Trash2 size={15} color={COLORS.danger} /></button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -3374,6 +3783,8 @@ export default function App() {
   const [products, setProducts] = useState([]);
   const [salesLog, setSalesLog] = useState([]);
   const [viewInvoice, setViewInvoice] = useState(null);
+  const [previewProduct, setPreviewProduct] = useState(null);
+  useEffect(() => { quickViewSetter = setPreviewProduct; return () => { quickViewSetter = null; }; }, []);
   const [cart, setCart] = useState({});
   const [route, setRoute] = useState({ page: 'home', params: {} });
   const [query, setQuery] = useState('');
@@ -3548,6 +3959,14 @@ export default function App() {
     [customCategoriesWithIcon]
   );
 
+  const [toast, setToast] = useState(null);
+  const toastTimerRef = useRef(null);
+  const showToast = (message, onUndo) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast({ message, onUndo });
+    toastTimerRef.current = setTimeout(() => setToast(null), 4000);
+  };
+
   const addToCart = (product, n = 1) => {
     setCart((c) => {
       const current = c[product.id] || 0;
@@ -3563,14 +3982,20 @@ export default function App() {
     const stock = product ? (product.stock ?? Infinity) : Infinity;
     setCart((c) => ({ ...c, [id]: Math.min(qty, stock) }));
   };
-  const removeItem = (id) => { const c = { ...cart }; delete c[id]; setCart(c); };
+  const removeItem = (id) => {
+    const removedQty = cart[id];
+    const c = { ...cart }; delete c[id]; setCart(c);
+    if (removedQty) showToast('Removed from cart', () => setCart((cur) => ({ ...cur, [id]: removedQty })));
+  };
 
   const toggleWishlist = (id) => {
+    const wasWishlisted = !!wishlist[id];
     setWishlist((w) => {
       const n = { ...w };
       if (n[id]) delete n[id]; else n[id] = true;
       return n;
     });
+    if (wasWishlisted) showToast('Removed from wishlist', () => setWishlist((cur) => ({ ...cur, [id]: true })));
   };
 
   const addReview = async (productId, { name, rating, comment }) => {
@@ -3588,7 +4013,7 @@ export default function App() {
     return p ? { ...p, qty } : null;
   }).filter(Boolean), [cart, products]);
 
-  const subtotal = cartItems.reduce((s, i) => s + i.price * i.qty, 0);
+  const subtotal = cartItems.reduce((s, i) => s + bulkLineTotal(i), 0);
   const cartCount = Object.values(cart).reduce((a, b) => a + b, 0);
 
   const buyNow = (product, n) => { addToCart(product, n); nav('checkout'); };
@@ -3597,7 +4022,8 @@ export default function App() {
     const orderId = 'ORD' + String(Date.now()).slice(-6);
     const items = cartItems.map((i) => ({ id: i.id, name: i.name, price: i.price, qty: i.qty }));
     const upiCheckNote = data.payment === 'upi' ? '\n\u26a0\ufe0f Please verify this payment has actually been received in your UPI/bank app before packing this order.' : '';
-    const msg = `New order ${orderId} from ${data.name} (${data.mobile}).\nAddress: ${data.address}, ${data.pincode} (${data.area || ''}).\nItems:\n${items.map((i) => `- ${i.name} x${i.qty} = ${money(i.price * i.qty)}`).join('\n')}\nDelivery: ${data.deliveryCharge === 0 ? 'FREE' : money(data.deliveryCharge)}\nTotal: ${money(data.total)}\nPayment: ${paymentLabel(data.payment)}${data.paymentId ? ' (Ref: ' + data.paymentId + ')' : ''}${upiCheckNote}`;
+    const couponLine = data.couponCode ? `\nCoupon: ${data.couponCode} (-${money(data.discount || 0)})` : '';
+    const msg = `New order ${orderId} from ${data.name} (${data.mobile}).\nAddress: ${data.address}, ${data.pincode} (${data.area || ''}).\nItems:\n${items.map((i) => `- ${i.name} x${i.qty} = ${money(i.price * i.qty)}`).join('\n')}\nDelivery: ${data.deliveryCharge === 0 ? 'FREE' : money(data.deliveryCharge)}${couponLine}\nTotal: ${money(data.total)}\nPayment: ${paymentLabel(data.payment)}${data.paymentId ? ' (Ref: ' + data.paymentId + ')' : ''}${upiCheckNote}`;
     const waLink = `https://wa.me/${deliverySettings.whatsappNumber}?text=${encodeURIComponent(msg)}`;
     if (BACKEND_ENABLED) {
       sbRpc('decrement_stock', { items: items.map((i) => ({ id: i.id, qty: i.qty })) }).catch((e) => console.error('Stock decrement failed to sync:', e));
@@ -3699,12 +4125,20 @@ export default function App() {
           )
         )}
 
-        <div className="flex-1">
+        {!isAdminRoute && deliverySettings.announcementEnabled && deliverySettings.announcementText && (
+          <div className="overflow-hidden" style={{ background: COLORS.primary, whiteSpace: 'nowrap' }}>
+            <div className="ticker-track inline-block py-1.5" style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 11.5, color: '#fff' }}>
+              {deliverySettings.announcementText}
+            </div>
+          </div>
+        )}
+
+        <div className="flex-1 page-fade" key={route.page}>
           {route.page === 'home' && <HomePage products={products} nav={nav} onAdd={addToCart} cart={cart} area={deliveryArea} categories={allCategories} deliverySettings={deliverySettings} wishlist={wishlist} onToggleWishlist={toggleWishlist} />}
           {route.page === 'categories' && <CategoriesPage nav={nav} categories={allRealCategories} />}
           {route.page === 'category' && <ProductListPage products={categoryProducts} nav={nav} onAdd={addToCart} cart={cart} wishlist={wishlist} onToggleWishlist={toggleWishlist} />}
           {route.page === 'list' && <ProductListPage products={listProducts} nav={nav} onAdd={addToCart} cart={cart} wishlist={wishlist} onToggleWishlist={toggleWishlist} />}
-          {route.page === 'product' && <ProductPage product={currentProduct} nav={nav} onAdd={addToCart} onBuyNow={buyNow} qty={currentProduct ? (cart[currentProduct.id] || 0) : 0} />}
+          {route.page === 'product' && <ProductPage product={currentProduct} nav={nav} onAdd={addToCart} onBuyNow={buyNow} qty={currentProduct ? (cart[currentProduct.id] || 0) : 0} reviews={currentProduct ? reviews.filter((r) => r.productId === currentProduct.id) : []} onAddReview={addReview} isWishlisted={!!(currentProduct && wishlist[currentProduct.id])} onToggleWishlist={toggleWishlist} deliverySettings={deliverySettings} />}
           {route.page === 'cart' && <CartPage cartItems={cartItems} updateQty={updateQty} removeItem={removeItem} subtotal={subtotal} nav={nav} products={products} onAdd={addToCart} cart={cart} wishlist={wishlist} onToggleWishlist={toggleWishlist} />}
           {route.page === 'checkout' && (
             cartItems.length
@@ -3713,7 +4147,15 @@ export default function App() {
           )}
           {route.page === 'about' && <AboutPage deliverySettings={deliverySettings} nav={nav} />}
           {route.page === 'profile' && <ProfilePage />}
-          {route.page === 'my-orders' && <MyOrdersPage deliverySettings={deliverySettings} />}
+          {route.page === 'my-orders' && <MyOrdersPage deliverySettings={deliverySettings} onOrderAgain={(items) => {
+            let addedCount = 0;
+            items.forEach((it) => {
+              const p = products.find((pr) => pr.id === it.id);
+              if (p) { addToCart(p, it.qty); addedCount += 1; }
+            });
+            showToast(addedCount === items.length ? 'Added to cart' : `Added ${addedCount} of ${items.length} items (some no longer available)`);
+            nav('cart');
+          }} />}
           {route.page === 'game' && <GamePage />}
           {route.page === 'faq' && <FAQPage deliverySettings={deliverySettings} />}
           {route.page === 'terms' && <TermsPage deliverySettings={deliverySettings} />}
@@ -3741,12 +4183,31 @@ export default function App() {
         </div>
         <div style={{ height: 96 }} />
 
+        {!isAdminRoute && <FloatingActions deliverySettings={deliverySettings} />}
+        {toast && (
+          <div className="fixed left-1/2 flex items-center gap-3 px-4 py-3 rounded-full" style={{ bottom: 90, transform: 'translateX(-50%)', zIndex: 70, background: currentTheme === 'dark' ? '#2A2419' : '#221F1A', boxShadow: '0 8px 24px rgba(0,0,0,0.25)' }}>
+            <span style={{ fontFamily: bodyFont, fontSize: 12.5, color: '#fff' }}>{toast.message}</span>
+            {toast.onUndo && (
+              <button onClick={() => { toast.onUndo(); setToast(null); }} style={{ fontFamily: bodyFont, fontSize: 12.5, fontWeight: 700, color: COLORS.gold }}>Undo</button>
+            )}
+          </div>
+        )}
+
         <BottomNav page={route.page} nav={nav} cartCount={cartCount} />
       </div>
     </div>
     {viewInvoice && <InvoiceOverlay order={viewInvoice} deliverySettings={deliverySettings} onClose={() => setViewInvoice(null)} />}
+    {previewProduct && <QuickViewModal product={previewProduct} onClose={() => setPreviewProduct(null)} onAdd={addToCart} nav={nav} wishlist={wishlist} onToggleWishlist={toggleWishlist} />}
     <style>{`
       @media print { .app-shell { display: none !important; } }
+      html { scroll-behavior: smooth; }
+      button, a { transition: transform 0.15s ease, opacity 0.15s ease; }
+      button:active { transform: scale(0.96); }
+      .page-fade { animation: pageFadeIn 0.22s ease; }
+      @keyframes pageFadeIn {
+        from { opacity: 0; transform: translateY(6px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
       .rainbow-bg {
         background: linear-gradient(270deg, #FFF3B0, #FFD9B0, #FFC2D1, #E3C2FF, #C2D9FF, #C2F0E3, #D9FFC2, #FFF3B0);
         background-size: 400% 400%;
@@ -3756,6 +4217,11 @@ export default function App() {
         0% { background-position: 0% 50%; }
         50% { background-position: 100% 50%; }
         100% { background-position: 0% 50%; }
+      }
+      .ticker-track { animation: tickerScroll 16s linear infinite; }
+      @keyframes tickerScroll {
+        0% { transform: translateX(100%); }
+        100% { transform: translateX(-100%); }
       }
     `}</style>
     </>
