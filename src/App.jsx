@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Search, MapPin, ShoppingCart, Home, LayoutGrid, Package, Star, Plus, Minus,
-  Check, ChevronRight, ChevronDown, X, Sparkles, Droplet, Droplets,
+  Check, ChevronRight, ChevronDown, X, Sparkles, Droplet, Droplets, AlertTriangle,
   Wind, Heart, Palette, Baby, Sun, Tag, Lock, Truck, CreditCard, Banknote,
   MessageCircle, Trash2, PlusCircle, BarChart3, Users,
   ClipboardList, AlertCircle, CheckCircle2, ArrowLeft,
@@ -313,6 +313,18 @@ async function sbDelete(table, filterQs) {
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${currentAuthToken}` },
   });
   if (!res.ok) throw new Error(`Supabase delete on ${table} failed (${res.status})`);
+}
+async function sbUpsert(table, rows) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+    method: 'POST',
+    headers: {
+      apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${currentAuthToken}`,
+      'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=representation',
+    },
+    body: JSON.stringify(rows),
+  });
+  if (!res.ok) throw new Error(`Supabase upsert into ${table} failed (${res.status})`);
+  return res.json();
 }
 function buildUpiLink({ upiId, amountRupees, shopName, orderNote }) {
   const params = new URLSearchParams({
@@ -798,6 +810,12 @@ function Rail({ products, onOpen, onAdd, cart, wishlist, onToggleWishlist, size 
 function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack, title, shopName, products = [], nav, categories = [], deliverySettings, theme, setTheme, lang, setLang: setLangProp }) {
   const [focused, setFocused] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [searchHistory, setSearchHistory] = useState([]);
+  useEffect(() => {
+    window.storage.get('mm-search-history').then((r) => {
+      if (r && r.value) setSearchHistory(JSON.parse(r.value));
+    }).catch(() => {});
+  }, [focused]);
   const shopOpen = deliverySettings ? isShopOpen(deliverySettings) : true;
 
   const suggestions = useMemo(() => {
@@ -816,14 +834,14 @@ function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack
 
   if (title) {
     return (
-      <div className={`sticky top-0 z-20 flex items-center gap-3 px-4 py-3 ${theme !== 'dark' ? 'rainbow-bg' : ''}`} style={{ background: theme === 'dark' ? COLORS.bg : undefined, borderBottom: `1px solid ${COLORS.border}` }}>
+      <div className="sticky top-0 z-20 flex items-center gap-3 px-4 py-3" style={{ background: theme === 'dark' ? COLORS.bg : '#FFF3B0', borderBottom: `1px solid ${COLORS.border}` }}>
         <button onClick={onBack}><ArrowLeft size={20} color={COLORS.ink} /></button>
         <h1 style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 17, color: COLORS.ink }}>{title}</h1>
       </div>
     );
   }
   return (
-    <div className={`sticky top-0 z-20 ${theme !== 'dark' ? 'rainbow-bg' : ''}`} style={{ background: theme === 'dark' ? COLORS.bg : undefined, borderBottom: `1px solid ${COLORS.border}` }}>
+    <div className="sticky top-0 z-20" style={{ background: theme === 'dark' ? COLORS.bg : '#FFF3B0', borderBottom: `1px solid ${COLORS.border}` }}>
       <div className="flex items-center justify-between px-4 pt-3">
         <div className="flex items-center gap-2">
           <div>
@@ -862,7 +880,7 @@ function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack
                   className="text-left px-4 py-2.5"
                   style={{ borderBottom: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, fontWeight: 600, color: COLORS.ink }}
                 >
-                  \ud83d\udce4 Refer a Friend
+                  {'\ud83d\udce4 Refer a Friend'}
                 </button>
                 {[
                   { label: t('myDetails'), page: 'profile' },
@@ -928,6 +946,27 @@ function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack
           </div>
         </form>
 
+        {focused && !query.trim() && !!searchHistory.length && (
+          <div
+            className="absolute left-4 right-4 overflow-hidden z-30 p-3"
+            style={{ top: '100%', marginTop: -1, background: COLORS.card, border: `1.5px solid ${COLORS.primary}`, borderTop: 'none', borderRadius: '0 0 14px 14px', boxShadow: '0 10px 24px rgba(43,32,19,0.12)' }}
+          >
+            <span style={{ fontFamily: bodyFont, fontSize: 10, fontWeight: 700, color: COLORS.inkSoft, letterSpacing: 0.5 }}>RECENT SEARCHES</span>
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {searchHistory.map((q, i) => (
+                <button
+                  key={i}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => setQuery(q)}
+                  className="px-2.5 py-1.5 rounded-full"
+                  style={{ border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 11, color: COLORS.ink }}
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {hasSuggestions && (
           <div
             className="absolute left-4 right-4 overflow-hidden z-30"
@@ -1220,8 +1259,15 @@ function CategoriesPage({ nav, categories }) {
   );
 }
 
-function ProductListPage({ products, title, nav, onAdd, cart, wishlist, onToggleWishlist }) {
+function ProductListPage({ products, title, nav, onAdd, cart, wishlist, onToggleWishlist, categoryId }) {
   const [sort, setSort] = useState('default');
+  const [banner, setBanner] = useState(null);
+  useEffect(() => {
+    if (!categoryId || !BACKEND_ENABLED) return;
+    sbSelect('category_banners', `?select=*&category=eq.${categoryId}&enabled=eq.true`).then((rows) => {
+      if (rows && rows[0]) setBanner(rows[0]);
+    }).catch(() => {});
+  }, [categoryId]);
   const sorted = (() => {
     if (sort === 'price-asc') return [...products].sort((a, b) => a.price - b.price);
     if (sort === 'price-desc') return [...products].sort((a, b) => b.price - a.price);
@@ -1230,6 +1276,12 @@ function ProductListPage({ products, title, nav, onAdd, cart, wishlist, onToggle
   })();
   return (
     <div className="p-4">
+      {banner && (
+        <div className="rounded-2xl p-4 mb-3.5" style={{ background: `linear-gradient(120deg, ${banner.color1}, ${banner.color2})` }}>
+          {banner.title && <p style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 16, color: '#fff' }}>{banner.title}</p>}
+          {banner.subtitle && <p style={{ fontFamily: bodyFont, fontSize: 12, color: 'rgba(255,255,255,0.9)', marginTop: 2 }}>{banner.subtitle}</p>}
+        </div>
+      )}
       {!!products.length && (
         <div className="flex justify-end mb-3">
           <select value={sort} onChange={(e) => setSort(e.target.value)} className="px-3 py-2 rounded-full" style={{ background: 'transparent', border: `1px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: bodyFont, fontSize: 11.5, fontWeight: 700 }}>
@@ -1526,6 +1578,24 @@ function CartPage({ cartItems, updateQty, removeItem, subtotal, nav, products = 
   }
   return (
     <div className="pb-32">
+      <div className="px-4 pt-3 flex justify-end">
+        <button
+          onClick={async () => {
+            const encoded = encodeURIComponent(cartItems.map((i) => `${i.id}:${i.qty}`).join(','));
+            const url = `${window.location.origin}${window.location.pathname}?sharedCart=${encoded}`;
+            const text = `Check out my cart \u2014 tap to load the same items: ${url}`;
+            if (navigator.share) {
+              try { await navigator.share({ title: 'My Cart', text, url }); } catch (e) { /* cancelled */ }
+            } else {
+              window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+            }
+          }}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full"
+          style={{ border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontWeight: 700, fontSize: 11.5, color: COLORS.ink }}
+        >
+          <Share2 size={13} /> Share Cart
+        </button>
+      </div>
       <div className="p-4 flex flex-col gap-3">
         {cartItems.map((item) => (
           <div key={item.id} className="flex gap-3 p-3 rounded-2xl" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
@@ -1993,6 +2063,15 @@ function AboutPage({ deliverySettings, nav }) {
             </div>
             <ChevronRight size={16} color={COLORS.inkSoft} />
           </button>
+          <button onClick={() => nav('contact')} className="w-full flex items-center gap-3 rounded-xl p-3.5 text-left" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+            <div className="rounded-full flex items-center justify-center" style={{ width: 36, height: 36, background: `${COLORS.secondary}1A` }}>
+              <MessageCircle size={17} color={COLORS.secondary} />
+            </div>
+            <div className="flex-1">
+              <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>Contact Us</p>
+            </div>
+            <ChevronRight size={16} color={COLORS.inkSoft} />
+          </button>
         </div>
       </div>
 
@@ -2390,6 +2469,45 @@ function ProfilePage() {
           + Add New Address
         </button>
       )}
+    </div>
+  );
+}
+
+function ContactPage() {
+  const [name, setName] = useState('');
+  const [mobile, setMobile] = useState('');
+  const [message, setMessage] = useState('');
+  const [status, setStatus] = useState('');
+  const [sending, setSending] = useState(false);
+
+  const submit = async () => {
+    if (!message.trim()) { setStatus('Please write a message.'); return; }
+    if (!BACKEND_ENABLED) { setStatus('This isn\u2019t available right now \u2014 please use WhatsApp instead.'); return; }
+    setSending(true);
+    setStatus('');
+    try {
+      await sbInsert('contact_messages', [{ name: name.trim() || null, mobile: mobile.trim() || null, message: message.trim() }]);
+      setStatus('Sent! We\u2019ll get back to you soon.');
+      setName(''); setMobile(''); setMessage('');
+    } catch (e) {
+      setStatus('Could not send \u2014 please try again, or use WhatsApp instead.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="p-4 pb-10 flex flex-col gap-3.5">
+      <p style={{ fontFamily: bodyFont, fontSize: 12, color: COLORS.inkSoft, lineHeight: 1.6 }}>
+        Prefer not to use WhatsApp? Send us a message here instead and we&rsquo;ll get back to you.
+      </p>
+      <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name (optional)" className="px-3.5 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none' }} />
+      <input value={mobile} onChange={(e) => setMobile(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="Mobile number (optional)" className="px-3.5 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 13, outline: 'none' }} />
+      <textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Your message" rows={5} className="px-3.5 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none', resize: 'none' }} />
+      {status && <p style={{ fontFamily: bodyFont, fontSize: 12, color: status.startsWith('Sent') ? COLORS.secondary : COLORS.danger }}>{status}</p>}
+      <button onClick={submit} disabled={sending} className="w-full py-3.5 rounded-xl" style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 14, opacity: sending ? 0.7 : 1 }}>
+        {sending ? 'Sending\u2026' : 'Send Message'}
+      </button>
     </div>
   );
 }
@@ -2867,6 +2985,26 @@ function AdminOverview({ products, salesLog, onRefresh, onViewInvoice }) {
           <span style={{ fontFamily: bodyFont, fontSize: 11, fontWeight: 700, color: COLORS.ink }}>Refresh</span>
         </button>
       </div>
+      {(() => {
+        const lowStock = products.filter((p) => p.stock === 0 || p.stock <= LOW_STOCK_THRESHOLD);
+        return !!lowStock.length && (
+          <div className="rounded-2xl p-4 mb-4" style={{ background: `${COLORS.danger}14`, border: `1px solid ${COLORS.danger}40` }}>
+            <div className="flex items-center gap-2 mb-2">
+              <AlertTriangle size={16} color={COLORS.danger} />
+              <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.danger }}>{lowStock.length} product{lowStock.length > 1 ? 's need' : ' needs'} restocking</p>
+            </div>
+            <div className="flex flex-col gap-1">
+              {lowStock.slice(0, 8).map((p) => (
+                <div key={p.id} className="flex items-center justify-between">
+                  <span style={{ ...clamp1, fontFamily: bodyFont, fontSize: 11.5, color: COLORS.ink }}>{p.name}</span>
+                  <span style={{ fontFamily: monoFont, fontSize: 11, fontWeight: 700, color: p.stock === 0 ? COLORS.danger : COLORS.gold }}>{p.stock === 0 ? 'Out of stock' : `${p.stock} left`}</span>
+                </div>
+              ))}
+              {lowStock.length > 8 && <span style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft, marginTop: 2 }}>+{lowStock.length - 8} more</span>}
+            </div>
+          </div>
+        );
+      })()}
       <div className="grid grid-cols-2 gap-3 mb-5">
         {kpis.map((k) => (
           <div key={k.label} className="rounded-2xl p-4" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
@@ -3570,6 +3708,7 @@ function AdminDelivery({ settings, setSettings, categories }) {
       </div>
 
       <AdminCoupons />
+      <AdminCategoryBanners categories={categories} />
 
       <button onClick={save} className="w-full py-3.5 rounded-xl" style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 14 }}>Save Delivery Settings</button>
     </div>
@@ -3624,7 +3763,7 @@ function AdminCoupons() {
         <input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} placeholder="CODE, e.g. WELCOME10" className="flex-1 px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 12, outline: 'none' }} />
         <select value={form.discountType} onChange={(e) => setForm({ ...form, discountType: e.target.value })} className="px-2 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 11.5 }}>
           <option value="percent">% off</option>
-          <option value="flat">\u20b9 off</option>
+          <option value="flat">{'\u20b9 off'}</option>
         </select>
         <input value={form.discountValue} onChange={(e) => setForm({ ...form, discountValue: e.target.value.replace(/\D/g, '') })} placeholder="10" className="w-16 px-2 py-2.5 rounded-lg text-center" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 12, outline: 'none' }} />
       </div>
@@ -3644,6 +3783,64 @@ function AdminCoupons() {
               </div>
               <label className="flex items-center gap-1"><input type="checkbox" checked={c.active} onChange={() => toggleActive(c)} /><span style={{ fontSize: 10, fontFamily: bodyFont, color: COLORS.inkSoft }}>Active</span></label>
               <button onClick={() => removeCoupon(c.id)}><Trash2 size={15} color={COLORS.danger} /></button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AdminCategoryBanners({ categories = [] }) {
+  const [banners, setBanners] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState({ category: categories[0] ? categories[0].id : '', title: '', subtitle: '', color1: '#D9730D', color2: '#B23A5C', enabled: true });
+
+  const load = () => {
+    if (!BACKEND_ENABLED) { setLoading(false); return; }
+    sbSelect('category_banners', '?select=*').then(setBanners).catch((e) => console.error('Could not load category banners (has fix-contact-category-banners.sql been run?):', e)).finally(() => setLoading(false));
+  };
+  useEffect(load, []);
+
+  const save = async () => {
+    if (!form.category) return;
+    try {
+      await sbUpsert('category_banners', [{ category: form.category, enabled: form.enabled, title: form.title || null, subtitle: form.subtitle || null, color1: form.color1, color2: form.color2 }]);
+      load();
+    } catch (e) { console.error('Could not save category banner:', e); }
+  };
+  const removeBanner = async (category) => {
+    try { await sbDelete('category_banners', `category=eq.${category}`); load(); } catch (e) { console.error(e); }
+  };
+  const categoryName = (id) => (categories.find((c) => c.id === id) || {}).name || id;
+
+  if (!BACKEND_ENABLED) return null;
+
+  return (
+    <div className="rounded-2xl p-4 flex flex-col gap-3" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+      <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>Category Promo Banners</p>
+      <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft, lineHeight: 1.5 }}>Show a promo banner at the top of a specific category&rsquo;s page.</p>
+
+      <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12 }}>
+        {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+      </select>
+      <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Banner title" className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }} />
+      <input value={form.subtitle} onChange={(e) => setForm({ ...form, subtitle: e.target.value })} placeholder="Subtitle (optional)" className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }} />
+      <div className="flex gap-2">
+        <input type="color" value={form.color1} onChange={(e) => setForm({ ...form, color1: e.target.value })} className="flex-1 h-10 rounded-lg" style={{ border: `1px solid ${COLORS.border}` }} />
+        <input type="color" value={form.color2} onChange={(e) => setForm({ ...form, color2: e.target.value })} className="flex-1 h-10 rounded-lg" style={{ border: `1px solid ${COLORS.border}` }} />
+      </div>
+      <button onClick={save} className="py-2.5 rounded-lg" style={{ background: COLORS.ink, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>Save Banner</button>
+
+      {!loading && !!banners.length && (
+        <div className="flex flex-col gap-2 mt-1">
+          {banners.map((b) => (
+            <div key={b.category} className="flex items-center gap-2 p-2.5 rounded-lg" style={{ border: `1px solid ${COLORS.border}` }}>
+              <div className="flex-1">
+                <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12, color: COLORS.ink }}>{categoryName(b.category)}</p>
+                <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft }}>{b.enabled ? 'Active' : 'Off'} \u00b7 {b.title || 'No title'}</p>
+              </div>
+              <button onClick={() => removeBanner(b.category)}><Trash2 size={15} color={COLORS.danger} /></button>
             </div>
           ))}
         </div>
@@ -3714,6 +3911,47 @@ function AdminSecurity({ adminPassword, setAdminPassword, adminEmail }) {
   );
 }
 
+function AdminContactMessages() {
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const load = () => {
+    if (!BACKEND_ENABLED) { setLoading(false); return; }
+    sbSelect('contact_messages', '?select=*&order=created_at.desc').then((rows) => {
+      setMessages(rows.map((r) => ({ id: r.id, name: r.name, mobile: r.mobile, message: r.message, isRead: r.is_read, createdAt: r.created_at })));
+    }).catch((e) => console.error('Could not load contact messages (has fix-contact-category-banners.sql been run?):', e)).finally(() => setLoading(false));
+  };
+  useEffect(load, []);
+  const markRead = async (id) => { try { await sbUpdate('contact_messages', `id=eq.${id}`, { is_read: true }); load(); } catch (e) { console.error(e); } };
+  const removeMsg = async (id) => { try { await sbDelete('contact_messages', `id=eq.${id}`); load(); } catch (e) { console.error(e); } };
+
+  if (!BACKEND_ENABLED || loading || !messages.length) return null;
+  const unread = messages.filter((m) => !m.isRead).length;
+
+  return (
+    <div className="rounded-2xl p-4 mb-4 flex flex-col gap-2.5" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+      <div className="flex items-center justify-between">
+        <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>Contact Messages</p>
+        {unread > 0 && <Badge bg={COLORS.danger}>{unread} new</Badge>}
+      </div>
+      <div className="flex flex-col gap-2">
+        {messages.slice(0, 20).map((m) => (
+          <div key={m.id} className="p-3 rounded-lg" style={{ border: `1px solid ${m.isRead ? COLORS.border : COLORS.primary}` }}>
+            <div className="flex items-center justify-between">
+              <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12, color: COLORS.ink }}>{m.name || 'Anonymous'}{m.mobile ? ` \u00b7 ${m.mobile}` : ''}</p>
+              <div className="flex gap-2">
+                {!m.isRead && <button onClick={() => markRead(m.id)}><Check size={14} color={COLORS.secondary} /></button>}
+                <button onClick={() => removeMsg(m.id)}><Trash2 size={13} color={COLORS.danger} /></button>
+              </div>
+            </div>
+            <p style={{ fontFamily: bodyFont, fontSize: 12, color: COLORS.ink, marginTop: 4 }}>{m.message}</p>
+            <p style={{ fontFamily: bodyFont, fontSize: 10, color: COLORS.inkSoft, marginTop: 4 }}>{new Date(m.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function AdminCustomers({ salesLog }) {
   const map = {};
   salesLog.forEach((o) => {
@@ -3734,6 +3972,7 @@ function AdminCustomers({ salesLog }) {
   }
   return (
     <div className="p-4">
+      <AdminContactMessages />
       {!customers.length && <p style={{ fontFamily: bodyFont, color: COLORS.inkSoft, fontSize: 12.5, textAlign: 'center', marginTop: 40 }}>No customers yet.</p>}
       <div className="flex flex-col gap-3">
         {customers.map((c) => (
@@ -3920,6 +4159,27 @@ export default function App() {
     } catch (e) { /* ignore malformed URL */ }
   }, [loaded]);
 
+  const sharedCartHandled = useRef(false);
+  useEffect(() => {
+    if (!loaded || sharedCartHandled.current || !products.length) return;
+    sharedCartHandled.current = true;
+    try {
+      const shared = new URLSearchParams(window.location.search).get('sharedCart');
+      if (shared) {
+        const pairs = shared.split(',').map((s) => s.split(':'));
+        const nextCart = {};
+        pairs.forEach(([id, qty]) => {
+          const p = products.find((pr) => pr.id === id);
+          if (p) nextCart[id] = Math.min(Number(qty) || 1, p.stock ?? Infinity);
+        });
+        if (Object.keys(nextCart).length) {
+          setCart(nextCart);
+          nav('cart');
+        }
+      }
+    } catch (e) { /* ignore malformed URL */ }
+  }, [loaded, products]);
+
   useEffect(() => { if (loaded && !BACKEND_ENABLED) window.storage.set('mm-products', JSON.stringify(products)).catch(() => {}); }, [products, loaded]);
   useEffect(() => { if (loaded && !BACKEND_ENABLED) window.storage.set('mm-delivery', JSON.stringify(deliverySettings)).catch(() => {}); }, [deliverySettings, loaded]);
   useEffect(() => { if (loaded) window.storage.set('mm-cart', JSON.stringify(cart)).catch(() => {}); }, [cart, loaded]);
@@ -4055,7 +4315,17 @@ export default function App() {
     return products.filter((p) => p.name.toLowerCase().includes(q) || (p.categories || [p.category]).some((cid) => allCategories.find((c) => c.id === cid)?.name.toLowerCase().includes(q)));
   }, [query, products, allCategories]);
 
-  const runSearch = () => { if (query.trim()) nav('list', { title: `Results for "${query}"`, filter: 'search' }); };
+  const runSearch = () => {
+    if (!query.trim()) return;
+    nav('list', { title: `Results for "${query}"`, filter: 'search' });
+    window.storage.get('mm-search-history').then((r) => {
+      const prev = r && r.value ? JSON.parse(r.value) : [];
+      const next = [query.trim(), ...prev.filter((q) => q.toLowerCase() !== query.trim().toLowerCase())].slice(0, 8);
+      window.storage.set('mm-search-history', JSON.stringify(next)).catch(() => {});
+    }).catch(() => {
+      window.storage.set('mm-search-history', JSON.stringify([query.trim()])).catch(() => {});
+    });
+  };
 
   let categoryProducts = [];
   if (route.page === 'category') {
@@ -4077,7 +4347,7 @@ export default function App() {
 
   const isAdminRoute = route.page === 'admin';
   const showHeader = !isAdminRoute && route.page !== 'product' && route.page !== 'checkout';
-  const showBackHeader = route.page === 'category' || route.page === 'product' || route.page === 'checkout' || route.page === 'list' || route.page === 'about' || route.page === 'terms' || route.page === 'privacy' || route.page === 'faq' || route.page === 'profile' || route.page === 'my-orders' || route.page === 'game';
+  const showBackHeader = route.page === 'category' || route.page === 'product' || route.page === 'checkout' || route.page === 'list' || route.page === 'about' || route.page === 'terms' || route.page === 'privacy' || route.page === 'faq' || route.page === 'profile' || route.page === 'my-orders' || route.page === 'game' || route.page === 'contact';
 
   const headerTitleMap = {
     category: allCategories.find((c) => c.id === route.params.id)?.name,
@@ -4091,6 +4361,7 @@ export default function App() {
     profile: t('myDetails'),
     'my-orders': t('myOrders'),
     game: 'Catch the Products',
+    contact: 'Contact Us',
   };
 
   if (!loaded) {
@@ -4136,7 +4407,7 @@ export default function App() {
         <div className="flex-1 page-fade" key={route.page}>
           {route.page === 'home' && <HomePage products={products} nav={nav} onAdd={addToCart} cart={cart} area={deliveryArea} categories={allCategories} deliverySettings={deliverySettings} wishlist={wishlist} onToggleWishlist={toggleWishlist} />}
           {route.page === 'categories' && <CategoriesPage nav={nav} categories={allRealCategories} />}
-          {route.page === 'category' && <ProductListPage products={categoryProducts} nav={nav} onAdd={addToCart} cart={cart} wishlist={wishlist} onToggleWishlist={toggleWishlist} />}
+          {route.page === 'category' && <ProductListPage products={categoryProducts} nav={nav} onAdd={addToCart} cart={cart} wishlist={wishlist} onToggleWishlist={toggleWishlist} categoryId={route.params.id} />}
           {route.page === 'list' && <ProductListPage products={listProducts} nav={nav} onAdd={addToCart} cart={cart} wishlist={wishlist} onToggleWishlist={toggleWishlist} />}
           {route.page === 'product' && <ProductPage product={currentProduct} nav={nav} onAdd={addToCart} onBuyNow={buyNow} qty={currentProduct ? (cart[currentProduct.id] || 0) : 0} reviews={currentProduct ? reviews.filter((r) => r.productId === currentProduct.id) : []} onAddReview={addReview} isWishlisted={!!(currentProduct && wishlist[currentProduct.id])} onToggleWishlist={toggleWishlist} deliverySettings={deliverySettings} />}
           {route.page === 'cart' && <CartPage cartItems={cartItems} updateQty={updateQty} removeItem={removeItem} subtotal={subtotal} nav={nav} products={products} onAdd={addToCart} cart={cart} wishlist={wishlist} onToggleWishlist={toggleWishlist} />}
@@ -4158,6 +4429,7 @@ export default function App() {
           }} />}
           {route.page === 'game' && <GamePage />}
           {route.page === 'faq' && <FAQPage deliverySettings={deliverySettings} />}
+          {route.page === 'contact' && <ContactPage />}
           {route.page === 'terms' && <TermsPage deliverySettings={deliverySettings} />}
           {route.page === 'privacy' && <PrivacyPage deliverySettings={deliverySettings} />}
           {route.page === 'wishlist' && <WishlistPage products={products} wishlist={wishlist} nav={nav} onAdd={addToCart} cart={cart} onToggleWishlist={toggleWishlist} />}
