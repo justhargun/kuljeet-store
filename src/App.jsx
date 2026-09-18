@@ -886,14 +886,14 @@ function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack
 
   if (title) {
     return (
-      <div className="sticky top-0 z-20 flex items-center gap-3 px-4 py-3" style={{ background: theme === 'dark' ? COLORS.bg : '#FFF3B0', borderBottom: `1px solid ${COLORS.border}` }}>
+      <div className={`sticky top-0 z-20 flex items-center gap-3 px-4 py-3 ${theme !== 'dark' && bgStyle !== 'classic' ? 'rainbow-bg' : ''}`} style={{ background: theme === 'dark' ? COLORS.bg : bgStyle === 'classic' ? '#FFF3B0' : undefined }}>
         <button onClick={onBack}><ArrowLeft size={20} color={COLORS.ink} /></button>
         <h1 style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 17, color: COLORS.ink }}>{title}</h1>
       </div>
     );
   }
   return (
-    <div className="sticky top-0 z-20" style={{ background: theme === 'dark' ? COLORS.bg : '#FFF3B0', borderBottom: `1px solid ${COLORS.border}` }}>
+    <div className={`sticky top-0 z-20 ${theme !== 'dark' && bgStyle !== 'classic' ? 'rainbow-bg' : ''}`} style={{ background: theme === 'dark' ? COLORS.bg : bgStyle === 'classic' ? '#FFF3B0' : undefined }}>
       <div className="flex items-center justify-between px-4 pt-3">
         <div className="flex items-center gap-2">
           <div>
@@ -902,7 +902,7 @@ function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack
           </div>
         </div>
         <div className="flex items-center gap-2" style={{ position: 'relative' }}>
-          <button onClick={() => setShowMenu(!showMenu)} className="flex items-center justify-center rounded-full" style={{ width: 30, height: 30, background: 'transparent', border: `1px solid ${COLORS.border}` }}>
+          <button onClick={() => setShowMenu(!showMenu)} className="flex items-center justify-center rounded-full" style={{ width: 30, height: 30, background: 'transparent' }}>
             <MoreVertical size={15} color={COLORS.ink} />
           </button>
           {showMenu && (
@@ -951,16 +951,16 @@ function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack
             </>
           )}
           {setTheme && (
-            <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="flex items-center justify-center rounded-full" style={{ width: 30, height: 30, background: 'transparent', border: `1px solid ${COLORS.border}` }}>
+            <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="flex items-center justify-center rounded-full" style={{ width: 30, height: 30, background: 'transparent' }}>
               {theme === 'dark' ? <Sun size={14} color={COLORS.gold} /> : <Moon size={14} color={COLORS.secondary} />}
             </button>
           )}
           {setBgStyle && (
-            <button onClick={() => setBgStyle(bgStyle === 'classic' ? 'rainbow' : 'classic')} className="flex items-center justify-center rounded-full" style={{ width: 30, height: 30, background: 'transparent', border: `1px solid ${COLORS.border}` }}>
+            <button onClick={() => setBgStyle(bgStyle === 'classic' ? 'rainbow' : 'classic')} className="flex items-center justify-center rounded-full" style={{ width: 30, height: 30, background: 'transparent' }}>
               {bgStyle === 'classic' ? <Sparkles size={14} color={COLORS.rose} /> : <Palette size={14} color={COLORS.gold} />}
             </button>
           )}
-          <button onClick={onChangeLocation} className="flex items-center gap-1 px-2.5 py-1.5 rounded-full" style={{ background: 'transparent', border: `1px solid ${COLORS.border}` }}>
+          <button onClick={onChangeLocation} className="flex items-center gap-1 px-2.5 py-1.5 rounded-full" style={{ background: 'transparent' }}>
             <MapPin size={13} color={COLORS.secondary} />
             <span style={{ fontFamily: bodyFont, fontSize: 11, fontWeight: 700, color: COLORS.ink, maxWidth: 78, ...clamp1 }}>{area || t('setLocation')}</span>
             <ChevronDown size={12} color={COLORS.inkSoft} />
@@ -980,7 +980,7 @@ function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack
           <div
             className="flex items-center gap-2 px-3 py-2.5"
             style={{
-              background: 'transparent', border: `1.5px solid ${focused ? COLORS.primary : COLORS.border}`,
+              background: 'transparent', border: focused ? `1.5px solid ${COLORS.primary}` : 'none',
               borderRadius: hasSuggestions ? '14px 14px 0 0' : 14,
               boxShadow: focused ? '0 4px 14px rgba(217,115,13,0.12)' : 'none',
               transition: 'border-color 120ms ease, box-shadow 120ms ease',
@@ -1534,6 +1534,21 @@ function ProductPage({ product, nav, onAdd, onBuyNow, qty, reviews = [], onAddRe
             </span>
           </div>
         )}
+        <button
+          onClick={async () => {
+            const url = `${window.location.origin}${window.location.pathname}?p=${product.id}`;
+            const text = `Check out ${product.name} \u2014 ${url}`;
+            if (navigator.share) {
+              try { await navigator.share({ title: product.name, text, url }); } catch (e) { /* cancelled */ }
+            } else {
+              window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+            }
+          }}
+          className="flex items-center gap-1.5 mt-3 px-4 py-2 rounded-full"
+          style={{ border: `1.5px solid ${COLORS.border}`, fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}
+        >
+          <Share2 size={15} color={COLORS.ink} /> Share this product
+        </button>
         <div className="mt-4"><PriceTag price={product.price} mrp={product.mrp} size="lg" /></div>
 
         <div className="mt-5">
