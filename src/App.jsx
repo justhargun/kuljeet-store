@@ -886,14 +886,14 @@ function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack
 
   if (title) {
     return (
-      <div className={`sticky top-0 z-20 flex items-center gap-3 px-4 py-3 ${theme !== 'dark' && bgStyle !== 'classic' ? 'rainbow-bg' : ''}`} style={{ background: theme === 'dark' ? COLORS.bg : bgStyle === 'classic' ? '#FFF3B0' : undefined, borderBottom: `1px solid ${COLORS.border}` }}>
+      <div className="sticky top-0 z-20 flex items-center gap-3 px-4 py-3" style={{ background: theme === 'dark' ? COLORS.bg : '#FFF3B0', borderBottom: `1px solid ${COLORS.border}` }}>
         <button onClick={onBack}><ArrowLeft size={20} color={COLORS.ink} /></button>
         <h1 style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 17, color: COLORS.ink }}>{title}</h1>
       </div>
     );
   }
   return (
-    <div className={`sticky top-0 z-20 ${theme !== 'dark' && bgStyle !== 'classic' ? 'rainbow-bg' : ''}`} style={{ background: theme === 'dark' ? COLORS.bg : bgStyle === 'classic' ? '#FFF3B0' : undefined, borderBottom: `1px solid ${COLORS.border}` }}>
+    <div className="sticky top-0 z-20" style={{ background: theme === 'dark' ? COLORS.bg : '#FFF3B0', borderBottom: `1px solid ${COLORS.border}` }}>
       <div className="flex items-center justify-between px-4 pt-3">
         <div className="flex items-center gap-2">
           <div>
@@ -1319,6 +1319,8 @@ function CategoriesPage({ nav, categories }) {
 function ProductListPage({ products, title, nav, onAdd, cart, wishlist, onToggleWishlist, categoryId }) {
   const [sort, setSort] = useState('default');
   const [banner, setBanner] = useState(null);
+  const PAGE_SIZE = 20;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   useEffect(() => {
     if (!categoryId || !BACKEND_ENABLED) return;
     sbSelect('category_banners', `?select=*&category=eq.${categoryId}&enabled=eq.true`).then((rows) => {
@@ -1331,6 +1333,11 @@ function ProductListPage({ products, title, nav, onAdd, cart, wishlist, onToggle
     if (sort === 'rating') return [...products].sort((a, b) => b.rating - a.rating);
     return products;
   })();
+  // Reset how many are shown whenever the underlying list changes (new
+  // category, new search, sort changed) so we don't carry over a large
+  // count from a previous, longer list.
+  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [products, sort]);
+  const visible = sorted.slice(0, visibleCount);
   return (
     <div className="p-4">
       {banner && (
@@ -1355,11 +1362,22 @@ function ProductListPage({ products, title, nav, onAdd, cart, wishlist, onToggle
           <p style={{ fontFamily: bodyFont, color: COLORS.inkSoft, fontSize: 13 }}>{t('noProductsFound')}</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3">
-          {sorted.map((p) => (
-            <ProductCard key={p.id} product={p} onOpen={(pr) => nav('product', { id: pr.id })} onAdd={onAdd} qty={cart[p.id] || 0} isWishlisted={!!(wishlist && wishlist[p.id])} onToggleWishlist={onToggleWishlist} />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-2 gap-3">
+            {visible.map((p) => (
+              <ProductCard key={p.id} product={p} onOpen={(pr) => nav('product', { id: pr.id })} onAdd={onAdd} qty={cart[p.id] || 0} isWishlisted={!!(wishlist && wishlist[p.id])} onToggleWishlist={onToggleWishlist} />
+            ))}
+          </div>
+          {visibleCount < sorted.length && (
+            <button
+              onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+              className="w-full mt-4 py-3 rounded-xl"
+              style={{ border: `1.5px solid ${COLORS.primary}`, color: COLORS.primary, fontFamily: bodyFont, fontWeight: 700, fontSize: 13 }}
+            >
+              Show More ({sorted.length - visibleCount} left)
+            </button>
+          )}
+        </>
       )}
     </div>
   );
@@ -1852,7 +1870,7 @@ function CheckoutPage({ cartItems, subtotal, deliverySettings, nav, placeOrder }
         </button>
 
         <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft, marginTop: 14, maxWidth: 300 }}>
-          Prefer not to scan? This button below opens whichever UPI app your phone defaults to \u2014 only use it if that&rsquo;s the app your bank account is on.
+          {'Prefer not to scan? This button below opens whichever UPI app your phone defaults to \u2014 only use it if that\u2019s the app your bank account is on.'}
         </p>
         <button onClick={() => { window.location.href = upiLink; }} className="w-full mt-2 py-3 rounded-xl" style={{ border: `1px solid ${COLORS.border}`, color: COLORS.ink, fontFamily: bodyFont, fontWeight: 700, fontSize: 13 }}>
           Open in UPI App
@@ -2448,7 +2466,7 @@ function MyOrdersPage({ deliverySettings, onOrderAgain }) {
   return (
     <div className="p-4 pb-10">
       <p style={{ fontFamily: bodyFont, fontSize: 12, color: COLORS.inkSoft, lineHeight: 1.6, marginBottom: 16 }}>
-        Shows orders placed from this device only \u2014 nothing here is linked to an account, so it won\u2019t appear on a different phone or browser.
+        {'Shows orders placed from this device only \u2014 nothing here is linked to an account, so it won\u2019t appear on a different phone or browser.'}
       </p>
       {!ordersList.length && (
         <div className="flex flex-col items-center pt-10">
@@ -3015,7 +3033,7 @@ function InvoiceOverlay({ order, deliverySettings, onClose }) {
         </div>
         {isIOSStandalone && (
           <p className="no-print" style={{ fontFamily: bodyFont, fontSize: 10.5, color: '#888', padding: '0 16px', marginTop: 8, lineHeight: 1.5 }}>
-            Printing/saving as PDF isn&apos;t available inside the installed app on iPhone \u2014 that&apos;s an Apple limitation, not a bug. Open this site in Safari (not the Home Screen icon) to print or save as PDF, or use Share Invoice above to send it as text.
+            {'Printing/saving as PDF isn\u2019t available inside the installed app on iPhone \u2014 that\u2019s an Apple limitation, not a bug. Open this site in Safari (not the Home Screen icon) to print or save as PDF, or use Share Invoice above to send it as text.'}
           </p>
         )}
 
@@ -3203,6 +3221,12 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
   const [importMsg, setImportMsg] = useState('');
   const [optimizing, setOptimizing] = useState(false);
   const [showCatalog, setShowCatalog] = useState(false);
+  const [adminSearch, setAdminSearch] = useState('');
+  const [adminVisibleCount, setAdminVisibleCount] = useState(30);
+  const adminFilteredProducts = adminSearch.trim()
+    ? products.filter((p) => p.name.toLowerCase().includes(adminSearch.trim().toLowerCase()))
+    : products;
+  useEffect(() => { setAdminVisibleCount(30); }, [adminSearch]);
   const [optimizeMsg, setOptimizeMsg] = useState('');
   const [deleteError, setDeleteError] = useState('');
   const fileInputRef = useRef(null);
@@ -3526,8 +3550,20 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
         </div>
       )}
 
+      {products.length > 15 && (
+        <div className="relative mb-3">
+          <input value={adminSearch} onChange={(e) => setAdminSearch(e.target.value)} placeholder="Search your products by name" className="w-full px-3.5 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }} />
+        </div>
+      )}
       <div className="flex flex-col gap-3">
-        {products.map((p) => {
+        {(() => {
+          let displayProducts = adminFilteredProducts.slice(0, adminVisibleCount);
+          if (editingId && !displayProducts.some((p) => p.id === editingId)) {
+            const edited = adminFilteredProducts.find((p) => p.id === editingId);
+            if (edited) displayProducts = [edited, ...displayProducts];
+          }
+          return displayProducts;
+        })().map((p) => {
           const off = pctOff(Number(p.price), Number(p.mrp));
           if (editingId === p.id) {
             return (
@@ -3621,6 +3657,15 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
             </div>
           );
         })}
+        {adminVisibleCount < adminFilteredProducts.length && (
+          <button
+            onClick={() => setAdminVisibleCount((c) => c + 30)}
+            className="w-full py-3 rounded-xl"
+            style={{ border: `1.5px solid ${COLORS.primary}`, color: COLORS.primary, fontFamily: bodyFont, fontWeight: 700, fontSize: 13 }}
+          >
+            Show More ({adminFilteredProducts.length - adminVisibleCount} left)
+          </button>
+        )}
       </div>
     </div>
   );
@@ -3686,7 +3731,7 @@ function AdminDelivery({ settings, setSettings, categories }) {
           <span style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft, fontWeight: 700 }}>Google Maps link (optional, for precise directions)</span>
           <input value={local.mapsLink} onChange={(e) => setLocal({ ...local, mapsLink: e.target.value.trim() })} placeholder="https://maps.app.goo.gl/..." className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 12, outline: 'none' }} />
           <p style={{ fontFamily: bodyFont, fontSize: 10, color: COLORS.inkSoft, marginTop: 2, lineHeight: 1.5 }}>
-            Open Google Maps on your phone \u2192 search for or drop a pin exactly on your shop \u2192 tap Share \u2192 Copy link \u2192 paste it here. This makes "Get Directions" go straight to your exact door, since text addresses alone aren\u2019t always precise enough.
+            {'Open Google Maps on your phone \u2192 search for or drop a pin exactly on your shop \u2192 tap Share \u2192 Copy link \u2192 paste it here. This makes "Get Directions" go straight to your exact door, since text addresses alone aren\u2019t always precise enough.'}
           </p>
         </label>
         {field('Shop pincode', local.shopPincode, (e) => setLocal({ ...local, shopPincode: e.target.value.replace(/\D/g, '').slice(0, 6) }), true)}
@@ -3813,7 +3858,7 @@ function AdminDelivery({ settings, setSettings, categories }) {
                   </button>
                 ))}
               </div>
-              <p style={{ fontFamily: bodyFont, fontSize: 10, color: COLORS.inkSoft, marginTop: 4 }}>Fills in the fields below \u2014 tweak anything after picking one.</p>
+              <p style={{ fontFamily: bodyFont, fontSize: 10, color: COLORS.inkSoft, marginTop: 4 }}>{'Fills in the fields below \u2014 tweak anything after picking one.'}</p>
             </div>
             {field('Title (e.g. Diwali Dhamaka)', local.bannerTitle, (e) => setLocal({ ...local, bannerTitle: e.target.value }))}
             {field('Subtitle (e.g. Flat 25% off on Gift Hampers)', local.bannerSubtitle, (e) => setLocal({ ...local, bannerSubtitle: e.target.value }))}
@@ -3853,7 +3898,7 @@ function AdminDelivery({ settings, setSettings, categories }) {
                   <input type="date" value={local.bannerEndDate} onChange={(e) => setLocal({ ...local, bannerEndDate: e.target.value })} className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 12.5, outline: 'none' }} />
                 </label>
               </div>
-              <p style={{ fontFamily: bodyFont, fontSize: 10, color: COLORS.inkSoft, marginTop: 4 }}>Leave blank to control it only with the switch above. Set both dates and the banner will show itself automatically during that window, and hide itself after \u2014 no need to come back and turn it off.</p>
+              <p style={{ fontFamily: bodyFont, fontSize: 10, color: COLORS.inkSoft, marginTop: 4 }}>{'Leave blank to control it only with the switch above. Set both dates and the banner will show itself automatically during that window, and hide itself after \u2014 no need to come back and turn it off.'}</p>
             </div>
             <div className="rounded-2xl p-4 relative overflow-hidden mt-1" style={{ background: `linear-gradient(120deg, ${local.bannerColor1}, ${local.bannerColor2})` }}>
               <FestiveSparkles count={6} />
@@ -3878,7 +3923,7 @@ function AdminDelivery({ settings, setSettings, categories }) {
 
       <div className="rounded-2xl p-4 flex flex-col items-center gap-3" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
         <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink, alignSelf: 'flex-start' }}>Store QR Code</p>
-        <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft, alignSelf: 'flex-start', lineHeight: 1.5 }}>Print this and put it up in your shop \u2014 customers scan it to open your store instantly.</p>
+        <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft, alignSelf: 'flex-start', lineHeight: 1.5 }}>{'Print this and put it up in your shop \u2014 customers scan it to open your store instantly.'}</p>
         <img
           src={`https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(window.location.origin)}`}
           alt="Store QR code"
@@ -3960,7 +4005,7 @@ function AdminCoupons() {
       <button onClick={addCoupon} className="py-2.5 rounded-lg" style={{ background: COLORS.ink, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>Add Coupon</button>
 
       {loading ? (
-        <p style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.inkSoft }}>Loading\u2026</p>
+        <p style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.inkSoft }}>{'Loading\u2026'}</p>
       ) : (
         <div className="flex flex-col gap-2">
           {!coupons.length && <p style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.inkSoft }}>No coupons yet.</p>}
@@ -4083,7 +4128,7 @@ function AdminSecurity({ adminPassword, setAdminPassword, adminEmail }) {
             <input type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} placeholder="Confirm new password" className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }} />
             {msg && <p style={{ fontFamily: bodyFont, fontSize: 11.5, color: msg.type === 'error' ? COLORS.danger : COLORS.secondary }}>{msg.text}</p>}
             <button onClick={submitReal} disabled={busy} className="py-2.5 rounded-lg" style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, opacity: busy ? 0.7 : 1 }}>{busy ? 'Updating...' : 'Update Password'}</button>
-            <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft }}>This is your real login \u2014 the same one used in Supabase (Authentication &rarr; Users). It works the same on every device.</p>
+            <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft }}>{'This is your real login \u2014 the same one used in Supabase (Authentication \u2192 Users). It works the same on every device.'}</p>
           </>
         ) : (
           <>
@@ -4092,7 +4137,7 @@ function AdminSecurity({ adminPassword, setAdminPassword, adminEmail }) {
             <input type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} placeholder="Confirm new password" className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }} />
             {msg && <p style={{ fontFamily: bodyFont, fontSize: 11.5, color: msg.type === 'error' ? COLORS.danger : COLORS.secondary }}>{msg.text}</p>}
             <button onClick={submitLocal} className="py-2.5 rounded-lg" style={{ background: COLORS.primary, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>Update Password</button>
-            <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft }}>This password is stored only in this browser, not shared across devices, since Supabase isn\u2019t connected yet.</p>
+            <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft }}>{'This password is stored only in this browser, not shared across devices, since Supabase isn\u2019t connected yet.'}</p>
           </>
         )}
       </div>
@@ -4569,6 +4614,7 @@ export default function App() {
   return (
     <>
     <div className={`min-h-screen flex justify-center app-shell ${theme !== 'dark' && bgStyle !== 'classic' ? 'rainbow-bg' : ''}`} style={{ background: theme === 'dark' ? COLORS.bg : bgStyle === 'classic' ? 'linear-gradient(180deg, #FFF3B0 0%, #FBF6EC 600px)' : undefined, fontFamily: bodyFont }}>
+      <div className="fixed top-0 left-0 right-0" style={{ height: 'env(safe-area-inset-top)', background: theme === 'dark' ? COLORS.bg : '#FFF3B0', zIndex: 999 }} />
       <div className={`w-full flex flex-col ${theme !== 'dark' && bgStyle !== 'classic' ? 'rainbow-bg' : ''}`} style={{ maxWidth: 448, minHeight: '100vh', background: theme === 'dark' ? COLORS.bg : bgStyle === 'classic' ? 'linear-gradient(180deg, #FFF3B0 0%, #FBF6EC 600px)' : undefined, boxShadow: '0 0 40px rgba(0,0,0,0.06)' }}>
         {showLocationModal && !isAdminRoute && (
           <LocationModal
