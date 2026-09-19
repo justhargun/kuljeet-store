@@ -247,6 +247,16 @@ async function sbAuthUpdatePassword(newPassword) {
   if (!res.ok) throw new Error(data.error_description || data.msg || 'Could not update password.');
   return data;
 }
+async function sbAuthSignUp(email, password) {
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error_description || data.msg || 'Could not create account.');
+  return data;
+}
 async function sbAuthLogin(email, password) {
   const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
     method: 'POST',
@@ -468,6 +478,7 @@ function mapDeliveryFromDb(row, pinRows) {
     manuallyClosed: !!row.manually_closed,
     closedDays: Array.isArray(row.closed_days) ? row.closed_days : [],
     announcementEnabled: !!row.announcement_enabled, announcementText: row.announcement_text || '',
+    deliverySlots: Array.isArray(row.delivery_slots) ? row.delivery_slots : [],
     productsSeeded: !!row.products_seeded,
     adminPassword: row.admin_password || 'admin123',
     bannerEnabled: !!row.banner_enabled,
@@ -553,6 +564,7 @@ const SEED_DELIVERY = {
   closedDays: [],
   announcementEnabled: false,
   announcementText: '',
+  deliverySlots: [],
   productsSeeded: false,
   bannerEnabled: false,
   bannerTitle: '',
@@ -716,10 +728,10 @@ function ProductCard({ product, onOpen, onAdd, qty, isWishlisted, onToggleWishli
   return (
     <div
       className="rounded-2xl overflow-hidden flex flex-col cursor-pointer"
-      style={{ position: 'relative', background: currentTheme === 'dark' ? COLORS.card : 'transparent', border: `1px solid ${currentTheme === 'dark' ? COLORS.border : 'rgba(255,255,255,0.7)'}`, boxShadow: currentTheme === 'dark' ? 'none' : 'inset 0 1px 0 rgba(255,255,255,0.9), 0 4px 14px rgba(0,0,0,0.05)', minWidth: cardW, width: cardW }}
+      style={{ position: 'relative', background: currentTheme === 'dark' ? COLORS.card : 'rgba(0,0,0,0.06)', border: `1px solid ${currentTheme === 'dark' ? COLORS.border : 'rgba(0,0,0,0.14)'}`, boxShadow: currentTheme === 'dark' ? 'none' : 'inset 0 1px 0 rgba(255,255,255,0.3), 0 4px 14px rgba(0,0,0,0.08)', minWidth: cardW, width: cardW }}
       onClick={() => onOpen(product)}
     >
-      <div className="absolute inset-0" style={{ pointerEvents: 'none', zIndex: 2, boxShadow: `inset 1px 0 0 ${currentTheme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.55)'}, inset -1px 0 0 ${currentTheme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.55)'}` }} />
+      <div className="absolute inset-0" style={{ pointerEvents: 'none', zIndex: 2, boxShadow: `inset 1px 0 0 ${currentTheme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}, inset -1px 0 0 ${currentTheme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}` }} />
       <div className="relative flex items-center justify-center" style={{ height: imgH, background: product.imageUrl ? '#fff' : `linear-gradient(135deg, ${product.g1}, ${product.g2})` }}>
         {product.imageUrl ? (
           <img src={product.imageUrl} alt={product.name} className="w-full h-full" style={{ objectFit: 'cover' }} loading="lazy" decoding="async" />
@@ -1108,6 +1120,20 @@ function FloatingActions({ deliverySettings }) {
 }
 
 function BottomNav({ page, nav, cartCount }) {
+  const [shrunk, setShrunk] = useState(false);
+  const lastScrollY = useRef(0);
+  useEffect(() => {
+    const onScroll = () => {
+      const y = window.scrollY;
+      const goingDown = y > lastScrollY.current;
+      if (Math.abs(y - lastScrollY.current) > 4) {
+        setShrunk(goingDown && y > 40);
+        lastScrollY.current = y;
+      }
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
   const items = [
     { id: 'home', label: t('home'), Icon: Home },
     { id: 'categories', label: t('categories'), Icon: LayoutGrid },
@@ -1119,37 +1145,37 @@ function BottomNav({ page, nav, cartCount }) {
     <div
       className="fixed bottom-4 left-1/2 flex items-stretch"
       style={{
-        transform: 'translateX(-50%)', width: 'calc(100% - 72px)', maxWidth: 340,
+        transform: `translateX(-50%) scale(${shrunk ? 0.82 : 1})`, transformOrigin: 'bottom center',
+        transition: 'transform 0.25s ease',
+        width: 'calc(100% - 72px)', maxWidth: 340,
         overflow: 'hidden', zIndex: 60,
-        background: currentTheme === 'dark'
-          ? 'linear-gradient(160deg, rgba(255,255,255,0.10), rgba(30,26,20,0.22) 60%)'
-          : 'linear-gradient(160deg, rgba(255,255,255,0.55), rgba(255,255,255,0.18) 60%)',
-        border: `1px solid ${currentTheme === 'dark' ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.8)'}`,
+        background: 'linear-gradient(160deg, rgba(20,20,20,0.55), rgba(0,0,0,0.32) 60%)',
+        border: '1px solid rgba(255,255,255,0.18)',
         borderRadius: 999,
         boxShadow: [
           '0 10px 30px rgba(0,0,0,0.16)',
           '0 1px 2px rgba(0,0,0,0.06)',
-          `inset 0 1.5px 0 ${currentTheme === 'dark' ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.95)'}`,
-          `inset 0 -1.5px 0 rgba(0,0,0,0.05)`,
-          `inset 1px 0 0 ${currentTheme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.5)'}`,
-          `inset -1px 0 0 ${currentTheme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.5)'}`,
+          'inset 0 1.5px 0 rgba(255,255,255,0.14)',
+          'inset 0 -1.5px 0 rgba(0,0,0,0.15)',
+          'inset 1px 0 0 rgba(255,255,255,0.06)',
+          'inset -1px 0 0 rgba(255,255,255,0.06)',
         ].join(', '),
       }}
     >
-      <div className="absolute inset-0" style={{ pointerEvents: 'none', background: `linear-gradient(180deg, ${currentTheme === 'dark' ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.6)'} 0%, transparent 55%)` }} />
+      <div className="absolute inset-0" style={{ pointerEvents: 'none', background: 'linear-gradient(180deg, rgba(255,255,255,0.10) 0%, transparent 55%)' }} />
       {items.map((it) => {
         const active = page === it.id || (it.id === 'admin' && page.startsWith('admin'));
         return (
           <button key={it.id} onClick={() => nav(it.id)} className="flex-1 flex flex-col items-center justify-center gap-0.5 py-1.5 relative">
             <div className="relative">
-              <it.Icon size={16} color={active ? COLORS.primary : COLORS.inkSoft} strokeWidth={active ? 2.4 : 2} />
+              <it.Icon size={16} color={active ? '#FFB84D' : 'rgba(255,255,255,0.7)'} strokeWidth={active ? 2.4 : 2} />
               {!!it.badge && (
                 <span className="absolute rounded-full flex items-center justify-center" style={{ top: -5, right: -7, minWidth: 13, height: 13, background: COLORS.danger, color: '#fff', fontSize: 8, fontWeight: 700, fontFamily: bodyFont, padding: '0 2px' }}>
                   {it.badge}
                 </span>
               )}
             </div>
-            <span style={{ fontSize: 8, fontFamily: bodyFont, fontWeight: active ? 700 : 500, color: active ? COLORS.primary : COLORS.inkSoft }}>{it.label}</span>
+            <span style={{ fontSize: 8, fontFamily: bodyFont, fontWeight: active ? 700 : 500, color: active ? '#FFB84D' : 'rgba(255,255,255,0.7)' }}>{it.label}</span>
           </button>
         );
       })}
@@ -1744,6 +1770,7 @@ function CheckoutPage({ cartItems, subtotal, deliverySettings, nav, placeOrder }
   const [paying, setPaying] = useState(false);
   const [upiPending, setUpiPending] = useState(false);
   const [upiLink, setUpiLink] = useState('');
+  const [deliverySlot, setDeliverySlot] = useState('');
 
   useEffect(() => {
     if (form.pincode.length === 6) setZone(checkDeliveryZone(form.pincode, deliverySettings));
@@ -1811,7 +1838,7 @@ function CheckoutPage({ cartItems, subtotal, deliverySettings, nav, placeOrder }
       setPaying(true);
       const result = await payWithRazorpay({ amountRupees: total, shopName: deliverySettings.shopName, customerName: form.name, customerMobile: form.mobile });
       if (!result.success) { setPaying(false); return setError(result.error || 'Payment could not be completed.'); }
-      await placeOrder({ ...form, payment, deliveryCharge, total, subtotal, area: zone.area, paymentId: result.paymentId, couponCode: appliedCoupon ? appliedCoupon.code : null, discount });
+      await placeOrder({ ...form, payment, deliveryCharge, total, subtotal, area: zone.area, paymentId: result.paymentId, couponCode: appliedCoupon ? appliedCoupon.code : null, discount, deliverySlot: deliverySlot || null });
       setPaying(false);
       return;
     }
@@ -1823,14 +1850,14 @@ function CheckoutPage({ cartItems, subtotal, deliverySettings, nav, placeOrder }
       return;
     }
     setPaying(true);
-    await placeOrder({ ...form, payment, deliveryCharge, total, subtotal, area: zone.area, couponCode: appliedCoupon ? appliedCoupon.code : null, discount });
+    await placeOrder({ ...form, payment, deliveryCharge, total, subtotal, area: zone.area, couponCode: appliedCoupon ? appliedCoupon.code : null, discount, deliverySlot: deliverySlot || null });
     setPaying(false);
   };
 
   const [upiRef, setUpiRef] = useState('');
   const confirmUpiPaid = async () => {
     setPaying(true);
-    await placeOrder({ ...form, payment, deliveryCharge, total, subtotal, area: zone.area, paymentId: upiRef.trim() || undefined, couponCode: appliedCoupon ? appliedCoupon.code : null, discount });
+    await placeOrder({ ...form, payment, deliveryCharge, total, subtotal, area: zone.area, paymentId: upiRef.trim() || undefined, couponCode: appliedCoupon ? appliedCoupon.code : null, discount, deliverySlot: deliverySlot || null });
     setPaying(false);
   };
 
@@ -1935,6 +1962,27 @@ function CheckoutPage({ cartItems, subtotal, deliverySettings, nav, placeOrder }
         <input value={form.mobile} onChange={(e) => setForm({ ...form, mobile: e.target.value.replace(/\D/g, '').slice(0, 10) })} placeholder={t("mobileNumber")} className="px-4 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 13, outline: 'none' }} />
         <textarea value={form.address} onChange={set('address')} placeholder={t("deliveryAddress")} rows={3} className="px-4 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none', resize: 'none' }} />
         <input value={form.pincode} onChange={(e) => setForm({ ...form, pincode: e.target.value.replace(/\D/g, '').slice(0, 6) })} placeholder={t("pincode")} className="px-4 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 13, outline: 'none' }} />
+
+        {!!(deliverySettings.deliverySlots && deliverySettings.deliverySlots.length) && (
+          <div>
+            <span style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.inkSoft, fontWeight: 700 }}>Preferred delivery time (optional)</span>
+            <div className="flex gap-2 mt-1.5 flex-wrap">
+              {deliverySettings.deliverySlots.map((s) => {
+                const active = deliverySlot === s;
+                return (
+                  <button
+                    key={s}
+                    onClick={() => setDeliverySlot(active ? '' : s)}
+                    className="px-3 py-2 rounded-full"
+                    style={{ background: active ? COLORS.primary : 'transparent', color: active ? '#fff' : COLORS.ink, border: `1px solid ${active ? COLORS.primary : COLORS.border}`, fontFamily: bodyFont, fontWeight: 700, fontSize: 12 }}
+                  >
+                    {s}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {zone && zone.allowed && (
           <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ background: COLORS.successTint }}>
@@ -2834,6 +2882,8 @@ function AdminLogin({ onLogin, adminPassword }) {
   const [email, setEmail] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+  const [mode, setMode] = useState('login'); // 'login' | 'signup'
+  const [signupMsg, setSignupMsg] = useState('');
 
   const submitReal = async () => {
     setErr(''); setBusy(true);
@@ -2844,6 +2894,25 @@ function AdminLogin({ onLogin, adminPassword }) {
       onLogin(session.refresh_token, session.user && session.user.email ? session.user.email : email.trim());
     } catch (e) {
       setErr(e.message || 'Login failed.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const submitSignup = async () => {
+    setErr(''); setSignupMsg(''); setBusy(true);
+    try {
+      const data = await sbAuthSignUp(email.trim(), pw);
+      if (data.access_token) {
+        // Confirmed immediately (email confirmation is off) - log straight in.
+        setAuthToken(data.access_token);
+        await window.storage.set('mm-admin-refresh', data.refresh_token);
+        onLogin(data.refresh_token, data.user && data.user.email ? data.user.email : email.trim());
+      } else {
+        setSignupMsg('Account created! Check your email to confirm it, then come back and log in.');
+        setMode('login');
+      }
+    } catch (e) {
+      setErr(e.message || 'Could not create account.');
     } finally {
       setBusy(false);
     }
@@ -2862,11 +2931,23 @@ function AdminLogin({ onLogin, adminPassword }) {
         <>
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Admin email" className="w-full px-4 py-3 rounded-xl mb-2.5" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none' }} />
           <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder="Password" className="w-full px-4 py-3 rounded-xl mb-3" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none' }} />
+          {signupMsg && <p style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.secondary, marginBottom: 8, textAlign: 'center' }}>{signupMsg}</p>}
           {err && <p style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.danger, marginBottom: 8 }}>{err}</p>}
-          <button onClick={submitReal} disabled={busy} className="w-full py-3.5 rounded-xl" style={{ background: 'transparent', border: `1.5px solid ${COLORS.primary}`, color: COLORS.ink, fontFamily: bodyFont, fontWeight: 700, fontSize: 14, opacity: busy ? 0.7 : 1 }}>
-            {busy ? 'Logging in...' : 'Login'}
+          <button onClick={mode === 'signup' ? submitSignup : submitReal} disabled={busy} className="w-full py-3.5 rounded-xl" style={{ background: 'transparent', border: `1.5px solid ${COLORS.primary}`, color: COLORS.ink, fontFamily: bodyFont, fontWeight: 700, fontSize: 14, opacity: busy ? 0.7 : 1 }}>
+            {busy ? (mode === 'signup' ? 'Creating account...' : 'Logging in...') : (mode === 'signup' ? 'Create Account' : 'Login')}
           </button>
-          <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft, marginTop: 10, textAlign: 'center' }}>Log in with the admin account created in Supabase (Authentication &rarr; Users).</p>
+          {mode === 'login' ? (
+            <button onClick={() => { setMode('signup'); setErr(''); }} style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.primary, fontWeight: 700, marginTop: 12 }}>
+              New staff member? Create your account
+            </button>
+          ) : (
+            <button onClick={() => { setMode('login'); setErr(''); }} style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.inkSoft, fontWeight: 700, marginTop: 12 }}>
+              Already have an account? Log in instead
+            </button>
+          )}
+          <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft, marginTop: 10, textAlign: 'center' }}>
+            {mode === 'signup' ? 'The shop owner needs to have already added your email under Admin \u2192 Staff before your account will have any access.' : 'Log in with your Supabase account, or create a new one if the owner has added you as staff.'}
+          </p>
         </>
       ) : (
         <>
@@ -2881,14 +2962,17 @@ function AdminLogin({ onLogin, adminPassword }) {
   );
 }
 
-function AdminTabs({ tab, setTab }) {
-  const tabs = [
-    { id: 'overview', label: 'Overview', Icon: BarChart3 },
-    { id: 'products', label: 'Products', Icon: Package },
-    { id: 'delivery', label: 'Delivery', Icon: Truck },
-    { id: 'customers', label: 'Customers', Icon: Users },
-    { id: 'security', label: 'Security', Icon: KeyRound },
+function AdminTabs({ tab, setTab, permissions }) {
+  const p = permissions || { role: 'owner', canManageProducts: true, canManageOrders: true, canViewReports: true, canManageSettings: true };
+  const allTabs = [
+    { id: 'overview', label: 'Overview', Icon: BarChart3, show: p.canViewReports },
+    { id: 'products', label: 'Products', Icon: Package, show: p.canManageProducts },
+    { id: 'delivery', label: 'Delivery', Icon: Truck, show: p.canManageSettings },
+    { id: 'customers', label: 'Customers', Icon: Users, show: p.canViewReports },
+    { id: 'staff', label: 'Staff', Icon: Users, show: p.role === 'owner' },
+    { id: 'security', label: 'Security', Icon: KeyRound, show: true },
   ];
+  const tabs = allTabs.filter((t) => t.show);
   return (
     <div className="flex gap-2 overflow-x-auto px-4 py-3" style={{ borderBottom: `1px solid ${COLORS.border}` }}>
       {tabs.map((t) => (
@@ -3686,6 +3770,38 @@ function AdminProducts({ products, setProducts, categories, customCategories, se
   );
 }
 
+function DeliverySlotsSection({ local, setLocal }) {
+  const [newSlot, setNewSlot] = useState('');
+  const slots = local.deliverySlots || [];
+  const addSlot = () => {
+    if (!newSlot.trim()) return;
+    setLocal({ ...local, deliverySlots: [...slots, newSlot.trim()] });
+    setNewSlot('');
+  };
+  const removeSlot = (i) => setLocal({ ...local, deliverySlots: slots.filter((_, idx) => idx !== i) });
+
+  return (
+    <div className="rounded-2xl p-4 flex flex-col gap-3" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+      <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>Delivery Time Slots</p>
+      <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft, lineHeight: 1.5 }}>Let customers pick a delivery window at checkout, e.g. &ldquo;Evening 5-8pm&rdquo;. Leave empty to hide this at checkout.</p>
+      <div className="flex gap-2">
+        <input value={newSlot} onChange={(e) => setNewSlot(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addSlot()} placeholder="e.g. Evening 5-8pm" className="flex-1 px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }} />
+        <button onClick={addSlot} className="px-4 py-2.5 rounded-lg" style={{ background: COLORS.ink, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 12 }}>Add</button>
+      </div>
+      {!!slots.length && (
+        <div className="flex flex-col gap-2">
+          {slots.map((s, i) => (
+            <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg" style={{ border: `1px solid ${COLORS.border}` }}>
+              <span style={{ fontFamily: bodyFont, fontSize: 12.5, color: COLORS.ink }}>{s}</span>
+              <button onClick={() => removeSlot(i)}><Trash2 size={14} color={COLORS.danger} /></button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AdminDelivery({ settings, setSettings, categories }) {
   const [local, setLocal] = useState(settings);
   const [newPin, setNewPin] = useState({ pincode: '', area: '' });
@@ -3698,6 +3814,7 @@ function AdminDelivery({ settings, setSettings, categories }) {
         free_delivery_threshold: local.freeDeliveryThreshold, whatsapp_number: local.whatsappNumber, upi_id: local.upiId,
         open_time: local.openTime, close_time: local.closeTime, manually_closed: local.manuallyClosed, closed_days: local.closedDays || [],
         announcement_enabled: local.announcementEnabled, announcement_text: local.announcementText || null,
+        delivery_slots: local.deliverySlots || [],
         banner_enabled: local.bannerEnabled, banner_title: local.bannerTitle, banner_subtitle: local.bannerSubtitle,
         banner_cta: local.bannerCta, banner_category: local.bannerCategory, banner_emoji: local.bannerEmoji,
         banner_color1: local.bannerColor1, banner_color2: local.bannerColor2,
@@ -3845,6 +3962,8 @@ function AdminDelivery({ settings, setSettings, categories }) {
         <p style={{ fontFamily: bodyFont, fontSize: 10.5, color: COLORS.inkSoft, lineHeight: 1.5 }}>A scrolling text banner shown at the top of every page, e.g. for a sale or a delivery update.</p>
         <input value={local.announcementText} onChange={(e) => setLocal({ ...local, announcementText: e.target.value })} placeholder="e.g. Free delivery on orders above \u20b9299 this week!" className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }} />
       </div>
+
+      <DeliverySlotsSection local={local} setLocal={setLocal} />
 
       <div className="rounded-2xl p-4 flex flex-col gap-3" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
         <div className="flex items-center justify-between">
@@ -4098,6 +4217,98 @@ function AdminCategoryBanners({ categories = [] }) {
   );
 }
 
+function AdminStaff({ currentEmail }) {
+  const [staff, setStaff] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState({ email: '', name: '', role: 'staff', canManageProducts: true, canManageOrders: true, canViewReports: false, canManageSettings: false });
+  const [err, setErr] = useState('');
+
+  const load = () => {
+    setLoading(true);
+    sbSelect('staff_permissions', '?select=*&order=created_at.asc').then((rows) => {
+      setStaff(rows.map((r) => ({
+        id: r.id, email: r.email, name: r.name, role: r.role,
+        canManageProducts: r.can_manage_products, canManageOrders: r.can_manage_orders, canViewReports: r.can_view_reports, canManageSettings: r.can_manage_settings,
+      })));
+    }).catch((e) => console.error('Could not load staff (has fix-staff-permissions.sql been run?):', e)).finally(() => setLoading(false));
+  };
+  useEffect(load, []);
+
+  const addStaff = async () => {
+    setErr('');
+    if (!form.email.trim()) { setErr('Enter an email address.'); return; }
+    try {
+      await sbInsert('staff_permissions', [{
+        email: form.email.trim().toLowerCase(), name: form.name.trim() || null, role: form.role,
+        can_manage_products: form.canManageProducts, can_manage_orders: form.canManageOrders, can_view_reports: form.canViewReports, can_manage_settings: form.canManageSettings,
+      }]);
+      setForm({ email: '', name: '', role: 'staff', canManageProducts: true, canManageOrders: true, canViewReports: false, canManageSettings: false });
+      load();
+    } catch (e) {
+      setErr('Could not add \u2014 that email may already be listed.');
+    }
+  };
+  const togglePerm = async (s, key, dbKey) => {
+    try { await sbUpdate('staff_permissions', `id=eq.${s.id}`, { [dbKey]: !s[key] }); load(); }
+    catch (e) { console.error('Could not update permission:', e); }
+  };
+  const removeStaff = async (s) => {
+    if (s.email === currentEmail) { setErr('You can\u2019t remove your own access.'); return; }
+    try { await sbDelete('staff_permissions', `id=eq.${s.id}`); load(); }
+    catch (e) { console.error('Could not remove staff member:', e); }
+  };
+
+  return (
+    <div className="p-4 flex flex-col gap-4">
+      <p style={{ fontFamily: bodyFont, fontSize: 12, color: COLORS.inkSoft, lineHeight: 1.6 }}>
+        Add a staff member&rsquo;s email here first, with the permissions they should have. They then create their own login on the Admin login screen using that exact email &mdash; their password stays private to them.
+      </p>
+
+      <div className="rounded-2xl p-4 flex flex-col gap-3" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+        <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>Add Staff Member</p>
+        <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="Their email address" className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }} />
+        <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Name (optional)" className="px-3 py-2.5 rounded-lg" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 12.5, outline: 'none' }} />
+        <div className="flex flex-col gap-1.5">
+          <label className="flex items-center gap-2"><input type="checkbox" checked={form.canManageProducts} onChange={(e) => setForm({ ...form, canManageProducts: e.target.checked })} /><span style={{ fontFamily: bodyFont, fontSize: 12, color: COLORS.ink }}>Manage Products (add/edit stock, prices)</span></label>
+          <label className="flex items-center gap-2"><input type="checkbox" checked={form.canManageOrders} onChange={(e) => setForm({ ...form, canManageOrders: e.target.checked })} /><span style={{ fontFamily: bodyFont, fontSize: 12, color: COLORS.ink }}>Manage Orders</span></label>
+          <label className="flex items-center gap-2"><input type="checkbox" checked={form.canViewReports} onChange={(e) => setForm({ ...form, canViewReports: e.target.checked })} /><span style={{ fontFamily: bodyFont, fontSize: 12, color: COLORS.ink }}>View Sales &amp; Customer Reports</span></label>
+          <label className="flex items-center gap-2"><input type="checkbox" checked={form.canManageSettings} onChange={(e) => setForm({ ...form, canManageSettings: e.target.checked })} /><span style={{ fontFamily: bodyFont, fontSize: 12, color: COLORS.ink }}>Manage Delivery Settings, Coupons &amp; Banners</span></label>
+        </div>
+        {err && <p style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.danger }}>{err}</p>}
+        <button onClick={addStaff} className="py-2.5 rounded-lg" style={{ background: COLORS.ink, color: '#fff', fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5 }}>Add Staff Member</button>
+      </div>
+
+      {loading ? (
+        <p style={{ fontFamily: bodyFont, fontSize: 12, color: COLORS.inkSoft }}>Loading\u2026</p>
+      ) : (
+        <div className="flex flex-col gap-2.5">
+          {staff.map((s) => (
+            <div key={s.id} className="rounded-xl p-3.5" style={{ background: COLORS.card, border: `1px solid ${COLORS.border}` }}>
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>{s.name || s.email}{s.role === 'owner' ? ' \u2014 Owner' : ''}</p>
+                  <p style={{ fontFamily: monoFont, fontSize: 10.5, color: COLORS.inkSoft }}>{s.email}</p>
+                </div>
+                {s.role !== 'owner' && <button onClick={() => removeStaff(s)}><Trash2 size={15} color={COLORS.danger} /></button>}
+              </div>
+              {s.role === 'owner' ? (
+                <p style={{ fontFamily: bodyFont, fontSize: 11, color: COLORS.inkSoft }}>Full access to everything.</p>
+              ) : (
+                <div className="flex flex-col gap-1">
+                  <label className="flex items-center gap-2"><input type="checkbox" checked={s.canManageProducts} onChange={() => togglePerm(s, 'canManageProducts', 'can_manage_products')} /><span style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.ink }}>Manage Products</span></label>
+                  <label className="flex items-center gap-2"><input type="checkbox" checked={s.canManageOrders} onChange={() => togglePerm(s, 'canManageOrders', 'can_manage_orders')} /><span style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.ink }}>Manage Orders</span></label>
+                  <label className="flex items-center gap-2"><input type="checkbox" checked={s.canViewReports} onChange={() => togglePerm(s, 'canViewReports', 'can_view_reports')} /><span style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.ink }}>View Reports</span></label>
+                  <label className="flex items-center gap-2"><input type="checkbox" checked={s.canManageSettings} onChange={() => togglePerm(s, 'canManageSettings', 'can_manage_settings')} /><span style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.ink }}>Manage Settings</span></label>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AdminSecurity({ adminPassword, setAdminPassword, adminEmail }) {
   const [currentPw, setCurrentPw] = useState('');
   const [newPw, setNewPw] = useState('');
@@ -4242,19 +4453,22 @@ function AdminCustomers({ salesLog }) {
   );
 }
 
-function AdminPage({ products, setProducts, salesLog, refreshSalesLog, onViewInvoice, deliverySettings, setDeliverySettings, onLogout, adminPassword, setAdminPassword, allRealCategories, customCategories, setCustomCategories, adminEmail }) {
-  const [tab, setTab] = useState('overview');
+function AdminPage({ products, setProducts, salesLog, refreshSalesLog, onViewInvoice, deliverySettings, setDeliverySettings, onLogout, adminPassword, setAdminPassword, allRealCategories, customCategories, setCustomCategories, adminEmail, permissions }) {
+  const p = permissions || { role: 'owner', canManageProducts: true, canManageOrders: true, canViewReports: true, canManageSettings: true };
+  const defaultTab = p.canViewReports ? 'overview' : p.canManageProducts ? 'products' : p.canManageSettings ? 'delivery' : 'security';
+  const [tab, setTab] = useState(defaultTab);
   return (
     <div className="pb-6">
       <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: `1px solid ${COLORS.border}` }}>
         <h1 style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 17, color: COLORS.ink }}>Admin Dashboard</h1>
         <button onClick={onLogout} className="flex items-center gap-1"><LogOut size={15} color={COLORS.inkSoft} /><span style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.inkSoft }}>Logout</span></button>
       </div>
-      <AdminTabs tab={tab} setTab={setTab} />
-      {tab === 'overview' && <AdminOverview products={products} salesLog={salesLog} onRefresh={refreshSalesLog} onViewInvoice={onViewInvoice} />}
-      {tab === 'products' && <AdminProducts products={products} setProducts={setProducts} categories={allRealCategories} customCategories={customCategories} setCustomCategories={setCustomCategories} deliverySettings={deliverySettings} />}
-      {tab === 'delivery' && <AdminDelivery settings={deliverySettings} setSettings={setDeliverySettings} categories={allRealCategories} />}
-      {tab === 'customers' && <AdminCustomers salesLog={salesLog} />}
+      <AdminTabs tab={tab} setTab={setTab} permissions={p} />
+      {tab === 'overview' && p.canViewReports && <AdminOverview products={products} salesLog={salesLog} onRefresh={refreshSalesLog} onViewInvoice={onViewInvoice} />}
+      {tab === 'products' && p.canManageProducts && <AdminProducts products={products} setProducts={setProducts} categories={allRealCategories} customCategories={customCategories} setCustomCategories={setCustomCategories} deliverySettings={deliverySettings} />}
+      {tab === 'delivery' && p.canManageSettings && <AdminDelivery settings={deliverySettings} setSettings={setDeliverySettings} categories={allRealCategories} />}
+      {tab === 'customers' && p.canViewReports && <AdminCustomers salesLog={salesLog} />}
+      {tab === 'staff' && p.role === 'owner' && <AdminStaff currentEmail={adminEmail} />}
       {tab === 'security' && <AdminSecurity adminPassword={adminPassword} setAdminPassword={setAdminPassword} adminEmail={adminEmail} />}
     </div>
   );
@@ -4291,6 +4505,25 @@ export default function App() {
   const [adminEmail, setAdminEmail] = useState('');
   const adminRefreshRef = useRef(null);
   const [adminPassword, setAdminPassword] = useState('admin123');
+  const [myPermissions, setMyPermissions] = useState(null);
+  useEffect(() => {
+    if (!adminEmail || !BACKEND_ENABLED) { setMyPermissions(null); return; }
+    sbSelect('staff_permissions', `?select=*&email=eq.${encodeURIComponent(adminEmail)}`).then((rows) => {
+      if (rows && rows[0]) {
+        setMyPermissions({
+          role: rows[0].role, canManageProducts: rows[0].can_manage_products, canManageOrders: rows[0].can_manage_orders,
+          canViewReports: rows[0].can_view_reports, canManageSettings: rows[0].can_manage_settings,
+        });
+      } else {
+        // Not in staff_permissions at all (e.g. table doesn't exist yet, or
+        // this login predates the staff feature) - default to full access
+        // so nothing breaks for the existing admin.
+        setMyPermissions({ role: 'owner', canManageProducts: true, canManageOrders: true, canViewReports: true, canManageSettings: true });
+      }
+    }).catch(() => {
+      setMyPermissions({ role: 'owner', canManageProducts: true, canManageOrders: true, canViewReports: true, canManageSettings: true });
+    });
+  }, [adminEmail]);
   const [customCategories, setCustomCategories] = useState([]);
   const [reviews, setReviews] = useState([]);
   const [wishlist, setWishlist] = useState({});
@@ -4536,13 +4769,15 @@ export default function App() {
     const items = cartItems.map((i) => ({ id: i.id, name: i.name, price: i.price, qty: i.qty }));
     const upiCheckNote = data.payment === 'upi' ? '\n\u26a0\ufe0f Please verify this payment has actually been received in your UPI/bank app before packing this order.' : '';
     const couponLine = data.couponCode ? `\nCoupon: ${data.couponCode} (-${money(data.discount || 0)})` : '';
-    const msg = `New order ${orderId} from ${data.name} (${data.mobile}).\nAddress: ${data.address}, ${data.pincode} (${data.area || ''}).\nItems:\n${items.map((i) => `- ${i.name} x${i.qty} = ${money(i.price * i.qty)}`).join('\n')}\nDelivery: ${data.deliveryCharge === 0 ? 'FREE' : money(data.deliveryCharge)}${couponLine}\nTotal: ${money(data.total)}\nPayment: ${paymentLabel(data.payment)}${data.paymentId ? ' (Ref: ' + data.paymentId + ')' : ''}${upiCheckNote}`;
+    const slotLine = data.deliverySlot ? `\nPreferred delivery time: ${data.deliverySlot}` : '';
+    const msg = `New order ${orderId} from ${data.name} (${data.mobile}).\nAddress: ${data.address}, ${data.pincode} (${data.area || ''}).${slotLine}\nItems:\n${items.map((i) => `- ${i.name} x${i.qty} = ${money(i.price * i.qty)}`).join('\n')}\nDelivery: ${data.deliveryCharge === 0 ? 'FREE' : money(data.deliveryCharge)}${couponLine}\nTotal: ${money(data.total)}\nPayment: ${paymentLabel(data.payment)}${data.paymentId ? ' (Ref: ' + data.paymentId + ')' : ''}${upiCheckNote}`;
     const waLink = `https://wa.me/${deliverySettings.whatsappNumber}?text=${encodeURIComponent(msg)}`;
     if (BACKEND_ENABLED) {
       sbRpc('decrement_stock', { items: items.map((i) => ({ id: i.id, qty: i.qty })) }).catch((e) => console.error('Stock decrement failed to sync:', e));
       sbInsert('sales_log', [{
         id: orderId, customer_name: data.name, customer_mobile: data.mobile, customer_address: data.address, customer_pincode: data.pincode,
         items, subtotal: data.subtotal, delivery_charge: data.deliveryCharge, total: data.total, payment: data.payment, payment_ref: data.paymentId || null,
+        delivery_slot: data.deliverySlot || null,
       }]).catch((e) => console.error('Sales log failed to sync:', e));
     }
     setProducts(products.map((p) => {
@@ -4706,6 +4941,7 @@ export default function App() {
               adminPassword={adminPassword} setAdminPassword={setAdminPassword}
               allRealCategories={allRealCategories} customCategories={customCategories} setCustomCategories={setCustomCategories}
               adminEmail={adminEmail}
+              permissions={myPermissions}
             />
           )}
         </div>
