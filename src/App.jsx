@@ -4760,7 +4760,22 @@ export default function App() {
   }).filter(Boolean), [cart, products]);
 
   const subtotal = cartItems.reduce((s, i) => s + bulkLineTotal(i), 0);
-  const cartCount = Object.values(cart).reduce((a, b) => a + b, 0);
+  const cartCount = cartItems.reduce((a, i) => a + i.qty, 0);
+
+  // If a product was deleted while sitting in someone's cart, quietly drop
+  // it from the stored cart too, so it doesn't linger as a phantom entry
+  // that still counts toward the badge on a later visit.
+  useEffect(() => {
+    if (!loaded || !products.length) return;
+    const staleIds = Object.keys(cart).filter((id) => !products.some((p) => p.id === id));
+    if (staleIds.length) {
+      setCart((c) => {
+        const next = { ...c };
+        staleIds.forEach((id) => delete next[id]);
+        return next;
+      });
+    }
+  }, [products, loaded]);
 
   const buyNow = (product, n) => { addToCart(product, n); nav('checkout'); };
 
