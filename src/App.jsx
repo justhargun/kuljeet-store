@@ -1958,10 +1958,10 @@ function CheckoutPage({ cartItems, subtotal, deliverySettings, nav, placeOrder }
         </div>
       )}
       <div className="flex flex-col gap-2.5">
-        <input value={form.name} onChange={set('name')} placeholder={t("fullName")} className="px-4 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none' }} />
-        <input value={form.mobile} onChange={(e) => setForm({ ...form, mobile: e.target.value.replace(/\D/g, '').slice(0, 10) })} placeholder={t("mobileNumber")} className="px-4 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 13, outline: 'none' }} />
-        <textarea value={form.address} onChange={set('address')} placeholder={t("deliveryAddress")} rows={3} className="px-4 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none', resize: 'none' }} />
-        <input value={form.pincode} onChange={(e) => setForm({ ...form, pincode: e.target.value.replace(/\D/g, '').slice(0, 6) })} placeholder={t("pincode")} className="px-4 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 13, outline: 'none' }} />
+        <input value={form.name} onChange={set('name')} name="name" autoComplete="name" placeholder={t("fullName")} className="px-4 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none' }} />
+        <input value={form.mobile} onChange={(e) => setForm({ ...form, mobile: e.target.value.replace(/\D/g, '').slice(0, 10) })} name="tel" autoComplete="tel" placeholder={t("mobileNumber")} className="px-4 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 13, outline: 'none' }} />
+        <textarea value={form.address} onChange={set('address')} name="street-address" autoComplete="street-address" placeholder={t("deliveryAddress")} rows={3} className="px-4 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none', resize: 'none' }} />
+        <input value={form.pincode} onChange={(e) => setForm({ ...form, pincode: e.target.value.replace(/\D/g, '').slice(0, 6) })} name="postal-code" autoComplete="postal-code" placeholder={t("pincode")} className="px-4 py-3 rounded-xl" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: monoFont, fontSize: 13, outline: 'none' }} />
 
         {!!(deliverySettings.deliverySlots && deliverySettings.deliverySlots.length) && (
           <div>
@@ -2929,8 +2929,8 @@ function AdminLogin({ onLogin, adminPassword }) {
 
       {BACKEND_ENABLED ? (
         <>
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Admin email" className="w-full px-4 py-3 rounded-xl mb-2.5" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none' }} />
-          <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder="Password" className="w-full px-4 py-3 rounded-xl mb-3" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none' }} />
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} name="email" autoComplete="email" placeholder="Admin email" className="w-full px-4 py-3 rounded-xl mb-2.5" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none' }} />
+          <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} name="password" autoComplete="current-password" placeholder="Password" className="w-full px-4 py-3 rounded-xl mb-3" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none' }} />
           {signupMsg && <p style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.secondary, marginBottom: 8, textAlign: 'center' }}>{signupMsg}</p>}
           {err && <p style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.danger, marginBottom: 8 }}>{err}</p>}
           <button onClick={mode === 'signup' ? submitSignup : submitReal} disabled={busy} className="w-full py-3.5 rounded-xl" style={{ background: 'transparent', border: `1.5px solid ${COLORS.primary}`, color: COLORS.ink, fontFamily: bodyFont, fontWeight: 700, fontSize: 14, opacity: busy ? 0.7 : 1 }}>
@@ -2951,7 +2951,7 @@ function AdminLogin({ onLogin, adminPassword }) {
         </>
       ) : (
         <>
-          <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder="Enter admin password" className="w-full px-4 py-3 rounded-xl mb-3" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none' }} />
+          <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} name="password" autoComplete="current-password" placeholder="Enter admin password" className="w-full px-4 py-3 rounded-xl mb-3" style={{ background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.border}`, fontFamily: bodyFont, fontSize: 13, outline: 'none' }} />
           {err && <p style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.danger, marginBottom: 8 }}>{err}</p>}
           <button onClick={submitLocal} className="w-full py-3.5 rounded-xl" style={{ background: 'transparent', border: `1.5px solid ${COLORS.primary}`, color: COLORS.ink, fontFamily: bodyFont, fontWeight: 700, fontSize: 14 }}>
             Login
