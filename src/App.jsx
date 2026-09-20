@@ -4531,15 +4531,21 @@ function AdminCustomers({ salesLog }) {
   );
 }
 
-function AdminPage({ products, setProducts, salesLog, refreshSalesLog, onViewInvoice, deliverySettings, setDeliverySettings, onLogout, adminPassword, setAdminPassword, allRealCategories, customCategories, setCustomCategories, adminEmail, permissions }) {
+function AdminPage({ products, setProducts, salesLog, refreshSalesLog, onViewInvoice, deliverySettings, setDeliverySettings, onLogout, adminPassword, setAdminPassword, allRealCategories, customCategories, setCustomCategories, adminEmail, permissions, nav }) {
   const p = permissions || { role: 'owner', canManageProducts: true, canManageOrders: true, canViewReports: true, canManageSettings: true };
   const defaultTab = p.canViewReports ? 'overview' : p.canManageProducts ? 'products' : p.canManageSettings ? 'delivery' : 'security';
   const [tab, setTab] = useState(defaultTab);
   return (
     <div className="pb-6">
       <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: `1px solid ${COLORS.border}` }}>
-        <h1 style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 17, color: COLORS.ink }}>Admin Dashboard</h1>
+        <button onClick={() => nav('home')} className="flex items-center gap-1.5">
+          <ArrowLeft size={17} color={COLORS.ink} />
+          <span style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12.5, color: COLORS.ink }}>Back to Store</span>
+        </button>
         <button onClick={onLogout} className="flex items-center gap-1"><LogOut size={15} color={COLORS.inkSoft} /><span style={{ fontFamily: bodyFont, fontSize: 11.5, color: COLORS.inkSoft }}>Logout</span></button>
+      </div>
+      <div className="px-4 pt-3">
+        <h1 style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 17, color: COLORS.ink }}>Admin Dashboard</h1>
       </div>
       <AdminTabs tab={tab} setTab={setTab} permissions={p} />
       {tab === 'overview' && p.canViewReports && <AdminOverview products={products} salesLog={salesLog} onRefresh={refreshSalesLog} onViewInvoice={onViewInvoice} />}
@@ -5051,6 +5057,7 @@ export default function App() {
               allRealCategories={allRealCategories} customCategories={customCategories} setCustomCategories={setCustomCategories}
               adminEmail={adminEmail}
               permissions={myPermissions}
+              nav={nav}
             />
           )}
           </div>
