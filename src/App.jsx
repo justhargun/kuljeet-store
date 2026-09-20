@@ -871,6 +871,63 @@ function Rail({ products, onOpen, onAdd, cart, wishlist, onToggleWishlist, size 
 }
 
 /* --------------------------------- HEADER / NAV --------------------------------- */
+function DesktopHeader({ query, setQuery, onSearch, area, onChangeLocation, shopName, products = [], nav, categories = [], route, cartCount, theme, setTheme, bgStyle, setBgStyle }) {
+  const [focused, setFocused] = useState(false);
+  const shopOpen = true;
+  const navLinks = [
+    { id: 'home', label: 'Home' },
+    { id: 'categories', label: 'Categories' },
+    { id: 'wishlist', label: 'Wishlist' },
+  ];
+  return (
+    <div className="sticky top-0 z-30" style={{ background: COLORS.card, borderBottom: `1px solid ${COLORS.border}` }}>
+      <div className="flex items-center gap-8 px-8 py-4">
+        <button onClick={() => nav('home')} style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 22, color: COLORS.ink, flexShrink: 0 }}>{shopName}</button>
+
+        <div className="flex-1 relative max-w-xl">
+          <div className="flex items-center gap-2 px-4 py-2.5 rounded-full" style={{ border: `1.5px solid ${focused ? COLORS.primary : COLORS.border}`, transition: 'border-color 120ms ease' }}>
+            <Search size={17} color={focused ? COLORS.primary : COLORS.inkSoft} />
+            <input
+              value={query} onChange={(e) => setQuery(e.target.value)}
+              onFocus={() => setFocused(true)} onBlur={() => setTimeout(() => setFocused(false), 150)}
+              onKeyDown={(e) => e.key === 'Enter' && onSearch()}
+              placeholder="Search products..." name="search" autoComplete="off"
+              style={{ fontFamily: bodyFont, fontSize: 14, color: COLORS.ink, background: 'transparent', outline: 'none', width: '100%' }}
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-6 flex-shrink-0">
+          {navLinks.map((l) => (
+            <button key={l.id} onClick={() => nav(l.id)} style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 13.5, color: route.page === l.id ? COLORS.primary : COLORS.ink }}>
+              {l.label}
+            </button>
+          ))}
+          <button onClick={onChangeLocation} className="flex items-center gap-1.5">
+            <MapPin size={15} color={COLORS.secondary} />
+            <span style={{ ...clamp1, maxWidth: 130, fontFamily: bodyFont, fontSize: 12.5, fontWeight: 700, color: COLORS.ink }}>{area || 'Set location'}</span>
+          </button>
+          <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+            {theme === 'dark' ? <Sun size={17} color={COLORS.gold} /> : <Moon size={17} color={COLORS.secondary} />}
+          </button>
+          <button onClick={() => setBgStyle(bgStyle === 'classic' ? 'rainbow' : 'classic')}>
+            {bgStyle === 'classic' ? <Sparkles size={17} color={COLORS.rose} /> : <Palette size={17} color={COLORS.gold} />}
+          </button>
+          <button onClick={() => nav('cart')} className="relative">
+            <ShoppingCart size={19} color={COLORS.ink} />
+            {!!cartCount && (
+              <span className="absolute rounded-full flex items-center justify-center" style={{ top: -7, right: -8, minWidth: 16, height: 16, background: COLORS.danger, color: '#fff', fontSize: 9.5, fontWeight: 700, fontFamily: bodyFont, padding: '0 3px' }}>
+                {cartCount}
+              </span>
+            )}
+          </button>
+          <button onClick={() => nav('admin')}><Lock size={17} color={COLORS.ink} /></button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack, title, shopName, products = [], nav, categories = [], deliverySettings, theme, setTheme, lang, setLang: setLangProp, bgStyle, setBgStyle }) {
   const [focused, setFocused] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -1233,6 +1290,27 @@ function LocationModal({ onClose, onConfirm, deliverySettings }) {
 }
 
 /* ----------------------------------- PAGES ----------------------------------- */
+function DesktopCategorySidebar({ categories = [], nav, activeCategoryId }) {
+  const realCats = categories.filter((c) => !c.virtual);
+  return (
+    <div style={{ width: 220, flexShrink: 0, position: 'sticky', top: 96 }}>
+      <p style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 12, color: COLORS.inkSoft, letterSpacing: 0.5, marginBottom: 10 }}>CATEGORIES</p>
+      <div className="flex flex-col gap-1">
+        <button onClick={() => nav('home')} className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-left" style={{ background: activeCategoryId === undefined ? COLORS.cream : 'transparent' }}>
+          <Home size={16} color={COLORS.ink} />
+          <span style={{ fontFamily: bodyFont, fontWeight: 700, fontSize: 13, color: COLORS.ink }}>All Products</span>
+        </button>
+        {realCats.map((c) => (
+          <button key={c.id} onClick={() => nav('category', { id: c.id })} className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-left" style={{ background: activeCategoryId === c.id ? COLORS.cream : 'transparent' }}>
+            <c.Icon size={16} color={c.color} />
+            <span style={{ fontFamily: bodyFont, fontWeight: activeCategoryId === c.id ? 700 : 500, fontSize: 13, color: COLORS.ink }}>{c.name}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function HomePage({ products, nav, onAdd, cart, area, categories, deliverySettings, wishlist, onToggleWishlist }) {
   const bestSellers = products.filter((p) => p.bestSeller);
   const newArrivals = products.filter((p) => p.isNew);
@@ -1314,7 +1392,7 @@ function HomePage({ products, nav, onAdd, cart, area, categories, deliverySettin
 
       <div className="mt-6" />
       <SectionHeader title={t('recommendedForYou')} />
-      <div className="grid grid-cols-2 gap-3 px-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3 px-4">
         {recommended.map((p) => (
           <ProductCard key={p.id} product={p} onOpen={(pr) => nav('product', { id: pr.id })} onAdd={onAdd} qty={cart[p.id] || 0} isWishlisted={!!(wishlist && wishlist[p.id])} onToggleWishlist={onToggleWishlist} />
         ))}
@@ -1389,7 +1467,7 @@ function ProductListPage({ products, title, nav, onAdd, cart, wishlist, onToggle
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3">
             {visible.map((p) => (
               <ProductCard key={p.id} product={p} onOpen={(pr) => nav('product', { id: pr.id })} onAdd={onAdd} qty={cart[p.id] || 0} isWishlisted={!!(wishlist && wishlist[p.id])} onToggleWishlist={onToggleWishlist} />
             ))}
@@ -1429,7 +1507,7 @@ function WishlistPage({ products, wishlist, nav, onAdd, cart, onToggleWishlist }
         </div>
       ) : (
         <>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3">
           {saved.map((p) => (
             <SwipeToDelete key={p.id} onDelete={() => onToggleWishlist(p.id)} borderRadius={16} revealWidth={52}>
               <ProductCard product={p} onOpen={(pr) => nav('product', { id: pr.id })} onAdd={onAdd} qty={cart[p.id] || 0} isWishlisted={true} onToggleWishlist={onToggleWishlist} />
@@ -1488,8 +1566,8 @@ function ProductPage({ product, nav, onAdd, onBuyNow, qty, reviews = [], onAddRe
   };
 
   return (
-    <div className="pb-32">
-      <div className="relative flex items-center justify-center" style={{ height: 240, overflow: 'hidden', background: product.imageUrl ? '#fff' : `linear-gradient(135deg, ${product.g1}, ${product.g2})` }}>
+    <div className="pb-32 product-page-root">
+      <div className="relative flex items-center justify-center product-page-image" style={{ height: 240, overflow: 'hidden', background: product.imageUrl ? '#fff' : `linear-gradient(135deg, ${product.g1}, ${product.g2})` }}>
         {product.imageUrl ? (
           <img src={product.imageUrl} alt={product.name} className="w-full h-full" style={{ objectFit: 'cover', cursor: 'zoom-in' }} onClick={() => setShowFullImage(true)} />
         ) : (
@@ -1698,7 +1776,7 @@ function CartPage({ cartItems, updateQty, removeItem, subtotal, nav, products = 
     );
   }
   return (
-    <div className="pb-32">
+    <div className="pb-32 cart-page-root">
       <div className="px-4 pt-3 flex justify-end">
         <button
           onClick={async () => {
@@ -1935,7 +2013,7 @@ function CheckoutPage({ cartItems, subtotal, deliverySettings, nav, placeOrder }
   }
 
   return (
-    <div className="p-4 pb-32">
+    <div className="p-4 pb-32 checkout-page-root">
       {shopClosed && (
         <div className="flex items-center gap-2 mb-4 px-3 py-2.5 rounded-xl" style={{ background: COLORS.dangerTint }}>
           <AlertCircle size={15} color={COLORS.danger} />
@@ -4479,6 +4557,12 @@ export default function App() {
   const [loaded, setLoaded] = useState(false);
   const [theme, setTheme] = useState('light');
   const [bgStyle, setBgStyle] = useState('classic');
+  const [isDesktop, setIsDesktop] = useState(typeof window !== 'undefined' && window.innerWidth >= 1024);
+  useEffect(() => {
+    const onResize = () => setIsDesktop(window.innerWidth >= 1024);
+    window.addEventListener('resize', onResize, { passive: true });
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
   const [lang, setLangState] = useState('en');
   setLang(lang); // mutate the shared currentLang before this render's JSX reads it via t()
   const [deliverySettings, setDeliverySettings] = useState(SEED_DELIVERY);
@@ -4880,7 +4964,7 @@ export default function App() {
     <>
     <div className={`min-h-screen flex justify-center app-shell ${theme !== 'dark' && bgStyle !== 'classic' ? 'rainbow-bg' : ''}`} style={{ background: theme === 'dark' ? COLORS.bg : bgStyle === 'classic' ? 'linear-gradient(180deg, #FFF3B0 0%, #FBF6EC 600px)' : undefined, fontFamily: bodyFont }}>
       <div className="fixed top-0 left-0 right-0" style={{ height: 'env(safe-area-inset-top)', background: theme === 'dark' ? COLORS.bg : '#FFF3B0', zIndex: 999 }} />
-      <div className={`w-full flex flex-col ${theme !== 'dark' && bgStyle !== 'classic' ? 'rainbow-bg' : ''}`} style={{ maxWidth: 448, minHeight: '100vh', background: theme === 'dark' ? COLORS.bg : bgStyle === 'classic' ? 'linear-gradient(180deg, #FFF3B0 0%, #FBF6EC 600px)' : undefined, boxShadow: '0 0 40px rgba(0,0,0,0.06)' }}>
+      <div className={`w-full flex flex-col ${theme !== 'dark' && bgStyle !== 'classic' ? 'rainbow-bg' : ''}`} style={{ maxWidth: isDesktop ? 1400 : 448, minHeight: '100vh', background: theme === 'dark' ? COLORS.bg : bgStyle === 'classic' ? 'linear-gradient(180deg, #FFF3B0 0%, #FBF6EC 600px)' : undefined, boxShadow: '0 0 40px rgba(0,0,0,0.06)' }}>
         {showLocationModal && !isAdminRoute && (
           <LocationModal
             deliverySettings={deliverySettings}
@@ -4894,7 +4978,13 @@ export default function App() {
         )}
 
         {!isAdminRoute && (
-          showBackHeader ? (
+          isDesktop ? (
+            <DesktopHeader
+              query={query} setQuery={setQuery} onSearch={runSearch} area={deliveryArea} onChangeLocation={() => setShowLocationModal(true)}
+              shopName={deliverySettings.shopName} products={products} nav={nav} categories={allRealCategories} route={route}
+              cartCount={cartCount} theme={theme} setTheme={setTheme} bgStyle={bgStyle} setBgStyle={setBgStyle}
+            />
+          ) : showBackHeader ? (
             <Header title={headerTitleMap[route.page] || ''} onBack={() => nav(route.page === 'product' ? 'home' : 'home')} theme={theme} bgStyle={bgStyle} />
           ) : (
             <Header query={query} setQuery={setQuery} onSearch={runSearch} area={deliveryArea} onChangeLocation={() => setShowLocationModal(true)} shopName={deliverySettings.shopName} products={products} nav={nav} categories={allRealCategories} deliverySettings={deliverySettings} theme={theme} setTheme={setTheme} lang={lang} setLang={setLangState} bgStyle={bgStyle} setBgStyle={setBgStyle} />
@@ -4909,7 +4999,11 @@ export default function App() {
           </div>
         )}
 
-        <div className="flex-1 page-fade" key={route.page}>
+        <div className="flex-1 page-fade" key={route.page} style={isDesktop && ['home', 'category', 'list', 'categories'].includes(route.page) ? { display: 'flex', gap: 32, alignItems: 'flex-start', padding: '24px 32px' } : undefined}>
+          {isDesktop && ['home', 'category', 'list', 'categories'].includes(route.page) && (
+            <DesktopCategorySidebar categories={allRealCategories} nav={nav} activeCategoryId={route.params.id} />
+          )}
+          <div style={isDesktop && ['home', 'category', 'list', 'categories'].includes(route.page) ? { flex: 1, minWidth: 0 } : undefined}>
           {route.page === 'home' && <HomePage products={products} nav={nav} onAdd={addToCart} cart={cart} area={deliveryArea} categories={allCategories} deliverySettings={deliverySettings} wishlist={wishlist} onToggleWishlist={toggleWishlist} />}
           {route.page === 'categories' && <CategoriesPage nav={nav} categories={allRealCategories} />}
           {route.page === 'category' && <ProductListPage products={categoryProducts} nav={nav} onAdd={addToCart} cart={cart} wishlist={wishlist} onToggleWishlist={toggleWishlist} categoryId={route.params.id} />}
@@ -4959,10 +5053,11 @@ export default function App() {
               permissions={myPermissions}
             />
           )}
+          </div>
         </div>
-        <div style={{ height: 96 }} />
+        {!isDesktop && <div style={{ height: 96 }} />}
 
-        {!isAdminRoute && <FloatingActions deliverySettings={deliverySettings} />}
+        {!isAdminRoute && !isDesktop && <FloatingActions deliverySettings={deliverySettings} />}
         {toast && (
           <div className="fixed left-1/2 flex items-center gap-3 px-4 py-3 rounded-full" style={{ bottom: 90, transform: 'translateX(-50%)', zIndex: 70, background: currentTheme === 'dark' ? '#2A2419' : '#221F1A', boxShadow: '0 8px 24px rgba(0,0,0,0.25)' }}>
             <span style={{ fontFamily: bodyFont, fontSize: 12.5, color: '#fff' }}>{toast.message}</span>
@@ -4972,7 +5067,7 @@ export default function App() {
           </div>
         )}
 
-        <BottomNav page={route.page} nav={nav} cartCount={cartCount} />
+        {!isDesktop && <BottomNav page={route.page} nav={nav} cartCount={cartCount} />}
       </div>
     </div>
     {viewInvoice && <InvoiceOverlay order={viewInvoice} deliverySettings={deliverySettings} onClose={() => setViewInvoice(null)} />}
@@ -5001,6 +5096,11 @@ export default function App() {
       @keyframes tickerScroll {
         0% { transform: translateX(100%); }
         100% { transform: translateX(-100%); }
+      }
+      @media (min-width: 1024px) {
+        .product-page-root { max-width: 720px; margin: 0 auto; }
+        .product-page-image { height: 420px !important; border-radius: 16px; margin-top: 24px; }
+        .cart-page-root, .checkout-page-root { max-width: 720px; margin: 0 auto; }
       }
     `}</style>
     </>
