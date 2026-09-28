@@ -701,7 +701,7 @@ function SwipeToDelete({ onDelete, children, borderRadius = 16, revealWidth = 76
   };
 
   return (
-    <div className="relative overflow-hidden" style={{ borderRadius, touchAction: 'pan-y' }}>
+    <div className="relative overflow-hidden" data-no-tab-swipe="true" style={{ borderRadius, touchAction: 'pan-y' }}>
       <div className="absolute inset-y-0 right-0 flex items-center justify-center" style={{ width: REVEAL, background: COLORS.danger }}>
         <button onClick={() => { setOpen(false); setDragX(0); onDelete(); }} className="flex flex-col items-center gap-0.5">
           <Trash2 size={16} color="#fff" />
@@ -955,14 +955,14 @@ function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack
 
   if (title) {
     return (
-      <div className={`sticky top-0 z-20 flex items-center gap-3 px-4 py-3 ${theme !== 'dark' && bgStyle !== 'classic' ? 'rainbow-bg' : ''}`} style={{ background: theme === 'dark' ? COLORS.bg : bgStyle === 'classic' ? '#E0C9A6' : undefined }}>
+      <div className={`sticky top-0 z-20 flex items-center gap-3 px-4 py-3 ${theme !== 'dark' && bgStyle !== 'classic' ? 'rainbow-bg' : ''}`} style={{ background: theme === 'dark' ? COLORS.bg : bgStyle === 'classic' ? '#B98D55' : undefined }}>
         <button onClick={onBack}><ArrowLeft size={20} color={COLORS.ink} /></button>
         <h1 style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 17, color: COLORS.ink }}>{title}</h1>
       </div>
     );
   }
   return (
-    <div className={`sticky top-0 z-20 ${theme !== 'dark' && bgStyle !== 'classic' ? 'rainbow-bg' : ''}`} style={{ background: theme === 'dark' ? COLORS.bg : bgStyle === 'classic' ? '#E0C9A6' : undefined }}>
+    <div className={`sticky top-0 z-20 ${theme !== 'dark' && bgStyle !== 'classic' ? 'rainbow-bg' : ''}`} style={{ background: theme === 'dark' ? COLORS.bg : bgStyle === 'classic' ? '#B98D55' : undefined }}>
       <div className="flex items-center justify-between px-4 pt-3">
         <div className="flex items-center gap-2">
           <div>
@@ -4594,6 +4594,8 @@ export default function App() {
   useEffect(() => { if (isAdmin) refreshSalesLog(); }, [isAdmin]);
   const [adminEmail, setAdminEmail] = useState('');
   const adminRefreshRef = useRef(null);
+  const slideRef = useRef({ page: 'home', cls: 'page-fade' });
+  const swipeStartRef = useRef(null);
   const [adminPassword, setAdminPassword] = useState('admin123');
   const [myPermissions, setMyPermissions] = useState(null);
   useEffect(() => {
@@ -4958,9 +4960,47 @@ export default function App() {
     returns: 'Returns & Refunds',
   };
 
+  const TAB_ORDER = ['home', 'categories', 'wishlist', 'cart'];
+  if (slideRef.current.page !== route.page) {
+    const from = TAB_ORDER.indexOf(slideRef.current.page);
+    const to = TAB_ORDER.indexOf(route.page);
+    let cls = 'page-fade';
+    if (!isDesktop && from !== -1 && to !== -1 && from !== to) {
+      cls = to > from ? 'page-slide-left' : 'page-slide-right';
+    }
+    slideRef.current = { page: route.page, cls };
+  }
+  const slideClass = slideRef.current.cls;
+
+  const onTabTouchStart = (e) => {
+    let el = e.target;
+    while (el && el !== e.currentTarget) {
+      if (el.dataset && el.dataset.noTabSwipe) { swipeStartRef.current = null; return; }
+      const tag = el.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') { swipeStartRef.current = null; return; }
+      if (el.scrollWidth > el.clientWidth + 2 && getComputedStyle(el).overflowX !== 'visible') { swipeStartRef.current = null; return; }
+      el = el.parentElement;
+    }
+    const t = e.touches[0];
+    swipeStartRef.current = { x: t.clientX, y: t.clientY };
+  };
+  const onTabTouchEnd = (e) => {
+    const start = swipeStartRef.current;
+    swipeStartRef.current = null;
+    if (!start) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    if (Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    const idx = TAB_ORDER.indexOf(route.page);
+    if (idx === -1) return;
+    if (dx < 0 && idx < TAB_ORDER.length - 1) nav(TAB_ORDER[idx + 1]);
+    else if (dx > 0 && idx > 0) nav(TAB_ORDER[idx - 1]);
+  };
+
   if (!loaded) {
     return (
-      <div className={`min-h-screen flex items-center justify-center ${theme !== 'dark' && bgStyle !== 'classic' ? 'rainbow-bg' : ''}`} style={{ background: theme === 'dark' ? COLORS.bg : bgStyle === 'classic' ? 'linear-gradient(180deg, #E0C9A6 0%, #F3EBDD 600px)' : undefined }}>
+      <div className={`min-h-screen flex items-center justify-center ${theme !== 'dark' && bgStyle !== 'classic' ? 'rainbow-bg' : ''}`} style={{ background: theme === 'dark' ? COLORS.bg : bgStyle === 'classic' ? 'linear-gradient(180deg, #B98D55 0%, #D9BE94 600px)' : undefined }}>
         <p style={{ fontFamily: displayFont, fontStyle: 'italic', fontSize: 18, color: COLORS.ink }}>Loading Kuljeet Store&hellip;</p>
       </div>
     );
@@ -4968,9 +5008,9 @@ export default function App() {
 
   return (
     <>
-    <div className={`min-h-screen flex justify-center app-shell ${theme !== 'dark' && bgStyle !== 'classic' ? 'rainbow-bg' : ''}`} style={{ background: theme === 'dark' ? COLORS.bg : bgStyle === 'classic' ? 'linear-gradient(180deg, #E0C9A6 0%, #F3EBDD 600px)' : undefined, fontFamily: bodyFont }}>
-      <div className="fixed top-0 left-0 right-0" style={{ height: 'env(safe-area-inset-top)', background: theme === 'dark' ? COLORS.bg : '#E0C9A6', zIndex: 999 }} />
-      <div className={`w-full flex flex-col ${theme !== 'dark' && bgStyle !== 'classic' ? 'rainbow-bg' : ''}`} style={{ maxWidth: isDesktop ? 1400 : 448, minHeight: '100vh', background: theme === 'dark' ? COLORS.bg : bgStyle === 'classic' ? 'linear-gradient(180deg, #E0C9A6 0%, #F3EBDD 600px)' : undefined, boxShadow: '0 0 40px rgba(0,0,0,0.06)' }}>
+    <div className={`min-h-screen flex justify-center app-shell ${theme !== 'dark' && bgStyle !== 'classic' ? 'rainbow-bg' : ''}`} style={{ background: theme === 'dark' ? COLORS.bg : bgStyle === 'classic' ? 'linear-gradient(180deg, #B98D55 0%, #D9BE94 600px)' : undefined, fontFamily: bodyFont }}>
+      <div className="fixed top-0 left-0 right-0" style={{ height: 'env(safe-area-inset-top)', background: theme === 'dark' ? COLORS.bg : '#B98D55', zIndex: 999 }} />
+      <div className={`w-full flex flex-col ${theme !== 'dark' && bgStyle !== 'classic' ? 'rainbow-bg' : ''}`} style={{ maxWidth: isDesktop ? 1400 : 448, minHeight: '100vh', background: theme === 'dark' ? COLORS.bg : bgStyle === 'classic' ? 'linear-gradient(180deg, #B98D55 0%, #D9BE94 600px)' : undefined, boxShadow: '0 0 40px rgba(0,0,0,0.06)' }}>
         {showLocationModal && !isAdminRoute && (
           <LocationModal
             deliverySettings={deliverySettings}
@@ -5005,7 +5045,7 @@ export default function App() {
           </div>
         )}
 
-        <div className="flex-1 page-fade" key={route.page} style={isDesktop && ['home', 'category', 'list', 'categories'].includes(route.page) ? { display: 'flex', gap: 32, alignItems: 'flex-start', padding: '24px 32px' } : undefined}>
+        <div className={`flex-1 ${slideClass}`} key={route.page} onTouchStart={onTabTouchStart} onTouchEnd={onTabTouchEnd} style={isDesktop && ['home', 'category', 'list', 'categories'].includes(route.page) ? { display: 'flex', gap: 32, alignItems: 'flex-start', padding: '24px 32px' } : undefined}>
           {isDesktop && ['home', 'category', 'list', 'categories'].includes(route.page) && (
             <DesktopCategorySidebar categories={allRealCategories} nav={nav} activeCategoryId={route.params.id} />
           )}
@@ -5088,6 +5128,17 @@ export default function App() {
       @keyframes pageFadeIn {
         from { opacity: 0; transform: translateY(6px); }
         to { opacity: 1; transform: translateY(0); }
+      }
+      html, body { overflow-x: clip; }
+      .page-slide-left { animation: slideInFromRight 0.28s cubic-bezier(0.22, 0.61, 0.36, 1); }
+      .page-slide-right { animation: slideInFromLeft 0.28s cubic-bezier(0.22, 0.61, 0.36, 1); }
+      @keyframes slideInFromRight {
+        from { opacity: 0; transform: translateX(36px); }
+        to { opacity: 1; transform: translateX(0); }
+      }
+      @keyframes slideInFromLeft {
+        from { opacity: 0; transform: translateX(-36px); }
+        to { opacity: 1; transform: translateX(0); }
       }
       .rainbow-bg {
         background: linear-gradient(270deg, #FFF3B0, #FFD9B0, #FFC2D1, #E3C2FF, #C2D9FF, #C2F0E3, #D9FFC2, #FFF3B0);
