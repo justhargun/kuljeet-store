@@ -955,14 +955,14 @@ function Header({ query = '', setQuery, onSearch, area, onChangeLocation, onBack
 
   if (title) {
     return (
-      <div className={`sticky top-0 z-20 flex items-center gap-3 px-4 py-3 ${theme !== 'dark' && bgStyle !== 'classic' ? 'rainbow-bg' : ''}`} style={{ background: theme === 'dark' ? COLORS.bg : bgStyle === 'classic' ? '#FFF3B0' : undefined }}>
+      <div className={`sticky top-0 z-20 flex items-center gap-3 px-4 py-3 ${theme !== 'dark' && bgStyle !== 'classic' ? 'rainbow-bg' : ''}`} style={{ background: theme === 'dark' ? COLORS.bg : bgStyle === 'classic' ? '#E0C9A6' : undefined }}>
         <button onClick={onBack}><ArrowLeft size={20} color={COLORS.ink} /></button>
         <h1 style={{ fontFamily: displayFont, fontWeight: 700, fontSize: 17, color: COLORS.ink }}>{title}</h1>
       </div>
     );
   }
   return (
-    <div className={`sticky top-0 z-20 ${theme !== 'dark' && bgStyle !== 'classic' ? 'rainbow-bg' : ''}`} style={{ background: theme === 'dark' ? COLORS.bg : bgStyle === 'classic' ? '#FFF3B0' : undefined }}>
+    <div className={`sticky top-0 z-20 ${theme !== 'dark' && bgStyle !== 'classic' ? 'rainbow-bg' : ''}`} style={{ background: theme === 'dark' ? COLORS.bg : bgStyle === 'classic' ? '#E0C9A6' : undefined }}>
       <div className="flex items-center justify-between px-4 pt-3">
         <div className="flex items-center gap-2">
           <div>
@@ -4960,7 +4960,7 @@ export default function App() {
 
   if (!loaded) {
     return (
-      <div className={`min-h-screen flex items-center justify-center ${theme !== 'dark' && bgStyle !== 'classic' ? 'rainbow-bg' : ''}`} style={{ background: theme === 'dark' ? COLORS.bg : bgStyle === 'classic' ? 'linear-gradient(180deg, #FFF3B0 0%, #FBF6EC 600px)' : undefined }}>
+      <div className={`min-h-screen flex items-center justify-center ${theme !== 'dark' && bgStyle !== 'classic' ? 'rainbow-bg' : ''}`} style={{ background: theme === 'dark' ? COLORS.bg : bgStyle === 'classic' ? 'linear-gradient(180deg, #E0C9A6 0%, #F3EBDD 600px)' : undefined }}>
         <p style={{ fontFamily: displayFont, fontStyle: 'italic', fontSize: 18, color: COLORS.ink }}>Loading Kuljeet Store&hellip;</p>
       </div>
     );
@@ -4968,9 +4968,9 @@ export default function App() {
 
   return (
     <>
-    <div className={`min-h-screen flex justify-center app-shell ${theme !== 'dark' && bgStyle !== 'classic' ? 'rainbow-bg' : ''}`} style={{ background: theme === 'dark' ? COLORS.bg : bgStyle === 'classic' ? 'linear-gradient(180deg, #FFF3B0 0%, #FBF6EC 600px)' : undefined, fontFamily: bodyFont }}>
-      <div className="fixed top-0 left-0 right-0" style={{ height: 'env(safe-area-inset-top)', background: theme === 'dark' ? COLORS.bg : '#FFF3B0', zIndex: 999 }} />
-      <div className={`w-full flex flex-col ${theme !== 'dark' && bgStyle !== 'classic' ? 'rainbow-bg' : ''}`} style={{ maxWidth: isDesktop ? 1400 : 448, minHeight: '100vh', background: theme === 'dark' ? COLORS.bg : bgStyle === 'classic' ? 'linear-gradient(180deg, #FFF3B0 0%, #FBF6EC 600px)' : undefined, boxShadow: '0 0 40px rgba(0,0,0,0.06)' }}>
+    <div className={`min-h-screen flex justify-center app-shell ${theme !== 'dark' && bgStyle !== 'classic' ? 'rainbow-bg' : ''}`} style={{ background: theme === 'dark' ? COLORS.bg : bgStyle === 'classic' ? 'linear-gradient(180deg, #E0C9A6 0%, #F3EBDD 600px)' : undefined, fontFamily: bodyFont }}>
+      <div className="fixed top-0 left-0 right-0" style={{ height: 'env(safe-area-inset-top)', background: theme === 'dark' ? COLORS.bg : '#E0C9A6', zIndex: 999 }} />
+      <div className={`w-full flex flex-col ${theme !== 'dark' && bgStyle !== 'classic' ? 'rainbow-bg' : ''}`} style={{ maxWidth: isDesktop ? 1400 : 448, minHeight: '100vh', background: theme === 'dark' ? COLORS.bg : bgStyle === 'classic' ? 'linear-gradient(180deg, #E0C9A6 0%, #F3EBDD 600px)' : undefined, boxShadow: '0 0 40px rgba(0,0,0,0.06)' }}>
         {showLocationModal && !isAdminRoute && (
           <LocationModal
             deliverySettings={deliverySettings}
